@@ -319,6 +319,7 @@ contract ERC20StakingRewardsDistribution {
     }
 
     function consolidateReward() public onlyInitialized onlyStarted {
+        updateRewardAmounts();
         uint64 _consolidationTimestamp =
             uint64(Math.min(block.timestamp, endingTimestamp));
         uint256 _lastPeriodDuration =
@@ -378,6 +379,7 @@ contract ERC20StakingRewardsDistribution {
         view
         returns (uint256[] memory)
     {
+        updateRewardAmounts();
         uint256[] memory _outstandingRewards =
             new uint256[](rewardTokens.length);
         if (!initialized || block.timestamp < startingTimestamp) {
