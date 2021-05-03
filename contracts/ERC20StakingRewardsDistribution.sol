@@ -105,13 +105,14 @@ contract ERC20StakingRewardsDistribution {
                 _rewardTokenAddress != address(0),
                 "ERC20StakingRewardsDistribution: 0 address as reward token"
             );
+            // TODO: Remove
             require(
                 _rewardAmount > 0,
                 "ERC20StakingRewardsDistribution: no reward"
             );
             ERC20 _rewardToken = ERC20(_rewardTokenAddress);
             require(
-                _rewardToken.balanceOf(address(this)) >= _rewardAmount,
+                _rewardToken.balanceOf(address(this)) == _rewardAmount,
                 "ERC20StakingRewardsDistribution: no funding"
             );
             rewardTokens.push(_rewardToken);
@@ -422,6 +423,15 @@ contract ERC20StakingRewardsDistribution {
                 .sub(claimedReward[_staker][_relatedRewardTokenAddress]);
         }
         return _outstandingRewards;
+    }
+
+    function updateRewardAmounts() onlyInitialized {
+        for (uint256 _i; _i < rewardTokens.length; _i++) {
+            ERC20 _rewardToken = rewardTokens[_i];
+            const _rewardTokenBalance = _rewardToken.balanceOf(address(this));
+            const _rewardTokenAmount = _rewardTokenBalance.add(totalClaimedRewards[_rewardToken]);
+            rewardAmount[_rewardToken] = _rewardTokenAmount;
+        }
     }
 
     function renounceOwnership() public onlyOwner {
