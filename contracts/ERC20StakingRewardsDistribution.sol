@@ -376,7 +376,6 @@ contract ERC20StakingRewardsDistribution {
 
     function claimableRewards(address _staker)
         public
-        view
         returns (uint256[] memory)
     {
         updateRewardAmounts();
@@ -427,12 +426,12 @@ contract ERC20StakingRewardsDistribution {
         return _outstandingRewards;
     }
 
-    function updateRewardAmounts() onlyInitialized {
+    function updateRewardAmounts() public onlyInitialized {
         for (uint256 _i; _i < rewardTokens.length; _i++) {
             ERC20 _rewardToken = rewardTokens[_i];
-            const _rewardTokenBalance = _rewardToken.balanceOf(address(this));
-            const _rewardTokenAmount = _rewardTokenBalance.add(totalClaimedRewards[_rewardToken]);
-            rewardAmount[_rewardToken] = _rewardTokenAmount;
+            uint256 _rewardTokenBalance = _rewardToken.balanceOf(address(this));
+            uint256 _rewardTokenAmount = _rewardTokenBalance.add(totalClaimedRewards[address(_rewardToken)]);
+            rewardAmount[address(_rewardToken)] = _rewardTokenAmount;
         }
     }
 
