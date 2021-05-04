@@ -333,8 +333,8 @@ contract ERC20StakingRewardsDistribution {
                     _relatedRewardTokenAddress
                 ] = recoverableUnassignedReward[_relatedRewardTokenAddress].add(
                     _lastPeriodDuration
-                        .mul(rewardAmount[_relatedRewardTokenAddress])
-                        .div(secondsDuration)
+                        .mul(rewardAmount[_relatedRewardTokenAddress].sub(totalClaimedRewards[_relatedRewardTokenAddress]))
+                        .div(endingTimestamp.sub(lastConsolidationTimestamp))
                 );
                 rewardPerStakedToken[_relatedRewardTokenAddress] = 0;
             } else {
@@ -342,9 +342,10 @@ contract ERC20StakingRewardsDistribution {
                     _relatedRewardTokenAddress
                 ] = rewardPerStakedToken[_relatedRewardTokenAddress].add(
                     _lastPeriodDuration
-                        .mul(rewardAmount[_relatedRewardTokenAddress])
+                        .mul(rewardAmount[_relatedRewardTokenAddress].sub(totalClaimedRewards[_relatedRewardTokenAddress]))
+                        .div(endingTimestamp.sub(lastConsolidationTimestamp))
                         .mul(MULTIPLIER)
-                        .div(totalStakedTokensAmount.mul(secondsDuration))
+                        .div(totalStakedTokensAmount)
                 );
             }
             // avoids subtraction underflow. If the rewards per staked tokens are 0,
