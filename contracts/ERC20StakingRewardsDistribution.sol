@@ -401,9 +401,10 @@ contract ERC20StakingRewardsDistribution {
             } else {
                 _localRewardPerStakedToken = _localRewardPerStakedToken.add(
                     _lastPeriodDuration
-                        .mul(rewardAmount[_relatedRewardTokenAddress])
+                        .mul(rewardAmount[_relatedRewardTokenAddress].sub(totalClaimedRewards[_relatedRewardTokenAddress]))
+                        .div(endingTimestamp.sub(lastConsolidationTimestamp))
                         .mul(MULTIPLIER)
-                        .div(totalStakedTokensAmount.mul(secondsDuration))
+                        .div(totalStakedTokensAmount)
                 );
             }
             uint256 _rewardsInTheCurrentPeriod =
