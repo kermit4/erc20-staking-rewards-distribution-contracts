@@ -32,11 +32,13 @@ contract ERC20StakingRewardsDistributionFactory is UpgradeableBeacon {
             new BeaconProxy(address(this), bytes(""));
         for (uint256 _i; _i < _rewardTokenAddresses.length; _i++) {
             uint256 _relatedAmount = _rewardAmounts[_i];
-            ERC20(_rewardTokenAddresses[_i]).safeTransferFrom(
-                msg.sender,
-                address(_distributionProxy),
-                _relatedAmount
-            );
+            if (_relatedAmount > 0) {
+                ERC20(_rewardTokenAddresses[_i]).safeTransferFrom(
+                    msg.sender,
+                    address(_distributionProxy),
+                    _relatedAmount
+                );
+            }
         }
         ERC20StakingRewardsDistribution _distribution =
             ERC20StakingRewardsDistribution(address(_distributionProxy));
