@@ -105,11 +105,6 @@ contract ERC20StakingRewardsDistribution {
                 _rewardTokenAddress != address(0),
                 "ERC20StakingRewardsDistribution: 0 address as reward token"
             );
-            // TODO: Remove
-            require(
-                _rewardAmount > 0,
-                "ERC20StakingRewardsDistribution: no reward"
-            );
             ERC20 _rewardToken = ERC20(_rewardTokenAddress);
             require(
                 _rewardToken.balanceOf(address(this)) == _rewardAmount,
