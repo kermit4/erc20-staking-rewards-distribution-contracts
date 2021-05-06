@@ -83,6 +83,7 @@ contract ERC20StakingRewardsDistribution {
     event Withdrawn(address indexed withdrawer, uint256 amount);
     event Claimed(address indexed claimer, uint256[] amounts);
     event Recovered(uint256[] amounts);
+    event UpdatedRewards(uint256[] amounts);
 
     function initialize(
         address[] calldata _rewardTokenAddresses,
@@ -345,13 +346,16 @@ contract ERC20StakingRewardsDistribution {
     }
 
     function updateRewardAmounts() public {
+        uint256[] memory _updatedAmounts = new uint256[](rewards.length);
         for (uint256 _i; _i < rewards.length; _i++) {
             Reward storage _reward = rewards[_i];
             IERC20 _rewardToken = IERC20(_reward.token);
             uint256 _rewardBalance = _rewardToken.balanceOf(address(this));
             uint256 _rewardAmount = _rewardBalance + _reward.claimed;
             _reward.amount = _rewardAmount;
+            _updatedAmounts[_i] = _rewardAmount;
         }
+        emit UpdatedRewards(_updatedAmounts);
     }
 
     function getRewardTokens() external view returns (address[] memory) {
