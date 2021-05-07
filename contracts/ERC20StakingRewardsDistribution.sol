@@ -284,14 +284,16 @@ contract ERC20StakingRewardsDistribution {
             StakerRewardInfo storage _stakerRewardInfo =
                 _staker.rewardInfo[_reward.token];
             if (totalStakedTokensAmount == 0) {
-                _reward.recoverable += ((_lastPeriodDuration * _reward.amount) /
-                    secondsDuration);
+                _reward.recoverable += ((_lastPeriodDuration *
+                    (_reward.amount - _reward.claimed)) /
+                    (endingTimestamp - lastConsolidationTimestamp));
                 // no need to update the reward per staked token since in this period
                 // there have been no staked tokens, so no reward has been given out to stakers
             } else {
-                _reward.perStakedToken += ((_lastPeriodDuration *
-                    _reward.amount *
-                    MULTIPLIER) / (totalStakedTokensAmount * secondsDuration));
+                _reward.perStakedToken += ((((_lastPeriodDuration *
+                    (_reward.amount - _reward.claimed)) /
+                    (endingTimestamp - lastConsolidationTimestamp)) *
+                    MULTIPLIER) / totalStakedTokensAmount);
             }
             uint256 _rewardSinceLastConsolidation =
                 (_staker.stake *
@@ -329,9 +331,10 @@ contract ERC20StakingRewardsDistribution {
             uint256 _localRewardPerStakedToken = _reward.perStakedToken;
             // only update reward per staked token if the last period had staked tokens
             if (totalStakedTokensAmount > 0) {
-                _localRewardPerStakedToken += ((_lastPeriodDuration *
-                    _reward.amount *
-                    MULTIPLIER) / (totalStakedTokensAmount * secondsDuration));
+                _localRewardPerStakedToken += ((((_lastPeriodDuration *
+                    (_reward.amount - _reward.claimed)) /
+                    (endingTimestamp - lastConsolidationTimestamp)) *
+                    MULTIPLIER) / totalStakedTokensAmount);
             }
             // calculate outstanding reward since the last time the staker actively consolidated
             uint256 _rewardSinceLastConsolidation =
