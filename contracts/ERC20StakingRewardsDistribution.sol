@@ -5,6 +5,7 @@ pragma solidity ^0.8.4;
 import "@openzeppelin/contracts/utils/math/Math.sol";
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
+import "./interfaces/IFixedProductMarketMaker.sol";
 
 /**
  * Errors codes:
@@ -203,7 +204,13 @@ contract ERC20StakingRewardsDistribution {
         require(_staker.stake >= _amount, "SRD13");
         _staker.stake -= _amount;
         totalStakedTokensAmount -= _amount;
+        IFixedProductMarketMaker _stakableToken =
+            IFixedProductMarketMaker(address(stakableToken));
+        uint256 _accruedFees = _stakableToken.feesWithdrawableBy(address(this));
         stakableToken.safeTransfer(msg.sender, _amount);
+        IERC20 _collateralToken =
+            IERC20(address(_stakableToken.collateralToken()));
+        _collateralToken.safeTransfer(msg.sender, _accruedFees);
         emit Withdrawn(msg.sender, _amount);
     }
 
