@@ -280,7 +280,6 @@ contract ERC20StakingRewardsDistribution {
     }
 
     function consolidateReward() public onlyStarted {
-        updateRewardAmounts();
         uint64 _consolidationTimestamp =
             uint64(Math.min(block.timestamp, endingTimestamp));
         uint256 _lastPeriodDuration =
@@ -314,11 +313,28 @@ contract ERC20StakingRewardsDistribution {
         lastConsolidationTimestamp = _consolidationTimestamp;
     }
 
+    function addRewards(address _token, uint256 _amount) public onlyOwner {
+        uint256[] memory _updatedAmounts = new uint256[](rewards.length);
+        for (uint32 _i = 0; _i < rewards.length; _i++) {
+            address _rewardTokenAddress = rewards[_i].token;
+            if (_rewardTokenAddress == _token) {
+                IERC20(_token).safeTransferFrom(
+                    msg.sender,
+                    address(this),
+                    _amount
+                );
+                rewards[_i].amount += _amount;
+            }
+            _updatedAmounts[_i] = rewards[_i].amount;
+        }
+        emit UpdatedRewards(_updatedAmounts);
+    }
+
     function claimableRewards(address _account)
         public
+        view
         returns (uint256[] memory)
     {
-        updateRewardAmounts();
         uint256[] memory _outstandingRewards = new uint256[](rewards.length);
         if (!initialized || block.timestamp < startingTimestamp) {
             for (uint256 _i; _i < rewards.length; _i++) {
@@ -354,19 +370,6 @@ contract ERC20StakingRewardsDistribution {
                 (_stakerRewardInfo.earned - _stakerRewardInfo.claimed);
         }
         return _outstandingRewards;
-    }
-
-    function updateRewardAmounts() public {
-        uint256[] memory _updatedAmounts = new uint256[](rewards.length);
-        for (uint256 _i; _i < rewards.length; _i++) {
-            Reward storage _reward = rewards[_i];
-            IERC20 _rewardToken = IERC20(_reward.token);
-            uint256 _rewardBalance = _rewardToken.balanceOf(address(this));
-            uint256 _rewardAmount = _rewardBalance + _reward.claimed;
-            _reward.amount = _rewardAmount;
-            _updatedAmounts[_i] = _rewardAmount;
-        }
-        emit UpdatedRewards(_updatedAmounts);
     }
 
     function getRewardTokens() external view returns (address[] memory) {
