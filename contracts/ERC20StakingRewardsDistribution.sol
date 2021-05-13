@@ -203,14 +203,14 @@ contract ERC20StakingRewardsDistribution {
         Staker storage _staker = stakers[msg.sender];
         require(_staker.stake >= _amount, "SRD13");
         _staker.stake -= _amount;
+        uint256 _feesToTransfer = getAccruedFees(_amount);
         totalStakedTokensAmount -= _amount;
+        stakableToken.safeTransfer(msg.sender, _amount);
         IFixedProductMarketMaker _stakableToken =
             IFixedProductMarketMaker(address(stakableToken));
-        uint256 _accruedFees = _stakableToken.feesWithdrawableBy(address(this));
-        stakableToken.safeTransfer(msg.sender, _amount);
         IERC20 _collateralToken =
             IERC20(address(_stakableToken.collateralToken()));
-        _collateralToken.safeTransfer(msg.sender, _accruedFees);
+        _collateralToken.safeTransfer(msg.sender, _feesToTransfer);
         emit Withdrawn(msg.sender, _amount);
     }
 
@@ -370,6 +370,21 @@ contract ERC20StakingRewardsDistribution {
                 (_stakerRewardInfo.earned - _stakerRewardInfo.claimed);
         }
         return _outstandingRewards;
+    }
+
+    function getAccruedFees(uint256 _amount) public view returns (uint256) {
+        IFixedProductMarketMaker _stakableToken =
+            IFixedProductMarketMaker(address(stakableToken));
+        uint256 _accruedFees = _stakableToken.feesWithdrawableBy(address(this));
+        IERC20 _collateralToken =
+            IERC20(address(_stakableToken.collateralToken()));
+        uint256 _feeBalance = _collateralToken.balanceOf(address(this));
+        uint256 _totalFees = _feeBalance + _accruedFees;
+        // TODO: Use totalStakedTokensAmount prior to subtracting withdraw amount
+        uint256 _feesPerStakedToken =
+            (_totalFees * MULTIPLIER) / totalStakedTokensAmount;
+        uint256 _feesToTransfer = (_feesPerStakedToken * _amount) / MULTIPLIER;
+        return _feesToTransfer;
     }
 
     function getRewardTokens() external view returns (address[] memory) {
