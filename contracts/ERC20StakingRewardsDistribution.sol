@@ -380,7 +380,6 @@ contract ERC20StakingRewardsDistribution {
             IERC20(address(_stakableToken.collateralToken()));
         uint256 _feeBalance = _collateralToken.balanceOf(address(this));
         uint256 _totalFees = _feeBalance + _accruedFees;
-        // TODO: Use totalStakedTokensAmount prior to subtracting withdraw amount
         uint256 _feesPerStakedToken =
             (_totalFees * MULTIPLIER) / totalStakedTokensAmount;
         uint256 _feesToTransfer = (_feesPerStakedToken * _amount) / MULTIPLIER;
