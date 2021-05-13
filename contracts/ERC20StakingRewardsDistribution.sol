@@ -362,7 +362,7 @@ contract ERC20StakingRewardsDistribution {
             // calculate outstanding reward since the last time the staker actively consolidated
             uint256 _rewardSinceLastConsolidation =
                 (_staker.stake *
-                    (_reward.perStakedToken -
+                    (_localRewardPerStakedToken -
                         _stakerRewardInfo.consolidatedPerStakedToken)) /
                     MULTIPLIER;
             _outstandingRewards[_i] =
