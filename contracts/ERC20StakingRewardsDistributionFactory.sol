@@ -13,6 +13,7 @@ contract ERC20StakingRewardsDistributionFactory is Ownable {
 
     address public implementation;
     IERC20StakingRewardsDistribution[] public distributions;
+    mapping(address => bool) validDistributions;
 
     event DistributionCreated(address owner, address deployedAt);
 
@@ -57,6 +58,7 @@ contract ERC20StakingRewardsDistributionFactory is Ownable {
         );
         _distribution.transferOwnership(msg.sender);
         distributions.push(_distribution);
+        validDistributions[address(_distribution)] = true;
         emit DistributionCreated(msg.sender, address(_distribution));
     }
 
