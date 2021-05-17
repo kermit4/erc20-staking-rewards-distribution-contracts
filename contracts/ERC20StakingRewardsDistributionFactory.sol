@@ -56,10 +56,11 @@ contract ERC20StakingRewardsDistributionFactory is Ownable {
             _locked,
             _stakingCap
         );
-        _distribution.transferOwnership(msg.sender);
+        address _owner = owner();
+        _distribution.transferOwnership(_owner);
         distributions.push(_distribution);
         validDistributions[address(_distribution)] = true;
-        emit DistributionCreated(msg.sender, address(_distribution));
+        emit DistributionCreated(_owner, address(_distribution));
     }
 
     function getDistributionsAmount() external view returns (uint256) {
