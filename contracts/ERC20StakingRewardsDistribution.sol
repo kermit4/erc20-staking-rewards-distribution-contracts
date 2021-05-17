@@ -307,7 +307,7 @@ contract ERC20StakingRewardsDistribution {
         lastConsolidationTimestamp = _consolidationTimestamp;
     }
 
-    function addRewards(address _token, uint256 _amount) public onlyOwner {
+    function addRewards(address _token, uint256 _amount) public {
         uint256[] memory _updatedAmounts = new uint256[](rewards.length);
         for (uint32 _i = 0; _i < rewards.length; _i++) {
             address _rewardTokenAddress = rewards[_i].token;
