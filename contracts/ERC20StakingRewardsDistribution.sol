@@ -105,7 +105,6 @@ contract ERC20StakingRewardsDistribution {
         bool _locked,
         uint256 _stakingCap
     ) external onlyUninitialized {
-        require(_startingTimestamp > block.timestamp, "SRD01");
         require(_endingTimestamp > _startingTimestamp, "SRD02");
         require(_rewardTokenAddresses.length == _rewardAmounts.length, "SRD03");
 
