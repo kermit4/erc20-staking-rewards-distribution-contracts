@@ -18,6 +18,9 @@ const {
 const ERC20StakingRewardsDistribution = artifacts.require(
     "ERC20StakingRewardsDistribution"
 );
+const ERC20StakingRewardsDistributionFactory = artifacts.require(
+    "ERC20StakingRewardsDistributionFactory"
+);
 const FirstRewardERC20 = artifacts.require("FirstRewardERC20");
 const SecondRewardERC20 = artifacts.require("SecondRewardERC20");
 const FirstStakableERC20 = artifacts.require("FirstStakableERC20");
@@ -25,7 +28,7 @@ const FirstStakableERC20 = artifacts.require("FirstStakableERC20");
 contract(
     "ERC20StakingRewardsDistribution - Single stakable, multi reward tokens - Claiming",
     () => {
-        let erc20DistributionInstance,
+        let erc20DistributionFactoryInstance,
             firstRewardTokenInstance,
             secondRewardTokenInstance,
             stakableTokenInstance,
@@ -37,7 +40,11 @@ contract(
         beforeEach(async () => {
             const accounts = await web3.eth.getAccounts();
             ownerAddress = accounts[0];
-            erc20DistributionInstance = await ERC20StakingRewardsDistribution.new(
+            const erc20DistributionInstance = await ERC20StakingRewardsDistribution.new(
+                { from: ownerAddress }
+            );
+            erc20DistributionFactoryInstance = await ERC20StakingRewardsDistributionFactory.new(
+                erc20DistributionInstance.address,
                 { from: ownerAddress }
             );
             firstRewardTokenInstance = await FirstRewardERC20.new();
@@ -50,23 +57,18 @@ contract(
 
         it("should succeed in claiming the full reward if only one staker stakes right from the first second", async () => {
             const stakedAmount = await toWei(20, stakableTokenInstance);
-            await initializeStaker({
-                erc20DistributionInstance,
-                stakableTokenInstance,
-                stakerAddress: firstStakerAddress,
-                stakableAmount: stakedAmount,
-            });
             const firstRewardAmount = await toWei(10, firstRewardTokenInstance);
             const secondRewardAmount = await toWei(
                 20,
                 secondRewardTokenInstance
             );
             const {
+                erc20DistributionInstance,
                 startingTimestamp,
                 endingTimestamp,
             } = await initializeDistribution({
                 from: ownerAddress,
-                erc20DistributionInstance,
+                erc20DistributionFactoryInstance,
                 stakableToken: stakableTokenInstance,
                 rewardTokens: [
                     firstRewardTokenInstance,
@@ -74,6 +76,12 @@ contract(
                 ],
                 rewardAmounts: [firstRewardAmount, secondRewardAmount],
                 duration: 10,
+            });
+            await initializeStaker({
+                erc20DistributionInstance,
+                stakableTokenInstance,
+                stakerAddress: firstStakerAddress,
+                stakableAmount: stakedAmount,
             });
             await fastForwardTo({
                 timestamp: startingTimestamp,
@@ -123,9 +131,328 @@ contract(
             );
         });
 
+        it("should fail when claiming zero rewards (claimAll)", async () => {
+            const stakedAmount = await toWei(20, stakableTokenInstance);
+            const firstRewardsAmount = await toWei(
+                10,
+                firstRewardTokenInstance
+            );
+            const secondRewardsAmount = await toWei(
+                20,
+                secondRewardTokenInstance
+            );
+            const {
+                startingTimestamp,
+                erc20DistributionInstance,
+            } = await initializeDistribution({
+                from: ownerAddress,
+                erc20DistributionFactoryInstance,
+                stakableToken: stakableTokenInstance,
+                rewardTokens: [
+                    firstRewardTokenInstance,
+                    secondRewardTokenInstance,
+                ],
+                rewardAmounts: [firstRewardsAmount, secondRewardsAmount],
+                duration: 10,
+            });
+            await initializeStaker({
+                erc20DistributionInstance,
+                stakableTokenInstance,
+                stakerAddress: firstStakerAddress,
+                stakableAmount: stakedAmount,
+            });
+            await fastForwardTo({ timestamp: startingTimestamp });
+            try {
+                await erc20DistributionInstance.claimAll(firstStakerAddress, {
+                    from: firstStakerAddress,
+                });
+                throw new Error("should have failed");
+            } catch (error) {
+                expect(error.message).to.contain("SRD23");
+            }
+        });
+
+        it("should succeed when claiming zero first rewards and all of the second rewards", async () => {
+            const stakedAmount = await toWei(20, stakableTokenInstance);
+            const firstRewardsAmount = await toWei(
+                10,
+                firstRewardTokenInstance
+            );
+            const secondRewardsAmount = await toWei(
+                20,
+                secondRewardTokenInstance
+            );
+            const {
+                erc20DistributionInstance,
+                startingTimestamp,
+                endingTimestamp,
+            } = await initializeDistribution({
+                from: ownerAddress,
+                erc20DistributionFactoryInstance,
+                stakableToken: stakableTokenInstance,
+                rewardTokens: [
+                    firstRewardTokenInstance,
+                    secondRewardTokenInstance,
+                ],
+                rewardAmounts: [firstRewardsAmount, secondRewardsAmount],
+                duration: 10,
+            });
+            await initializeStaker({
+                erc20DistributionInstance,
+                stakableTokenInstance,
+                stakerAddress: firstStakerAddress,
+                stakableAmount: stakedAmount,
+            });
+            await fastForwardTo({ timestamp: startingTimestamp });
+            // make sure the staking operation happens as soon as possible
+            await stakeAtTimestamp(
+                erc20DistributionInstance,
+                firstStakerAddress,
+                stakedAmount,
+                startingTimestamp
+            );
+            await fastForwardTo({ timestamp: endingTimestamp.add(new BN(1)) });
+            // staker staked for all of the campaign's duration
+            await erc20DistributionInstance.claim(
+                [firstRewardsAmount, 0],
+                firstStakerAddress,
+                { from: firstStakerAddress }
+            );
+            expect(
+                await firstRewardTokenInstance.balanceOf(firstStakerAddress)
+            ).to.be.equalBn(firstRewardsAmount);
+            expect(
+                await secondRewardTokenInstance.balanceOf(firstStakerAddress)
+            ).to.be.equalBn(ZERO_BN);
+            expect(
+                await firstRewardTokenInstance.balanceOf(
+                    erc20DistributionInstance.address
+                )
+            ).to.be.equalBn(ZERO_BN);
+            expect(
+                await secondRewardTokenInstance.balanceOf(
+                    erc20DistributionInstance.address
+                )
+            ).to.be.equalBn(secondRewardsAmount);
+        });
+
+        it("should succeed when claiming zero first reward and all of the second reward", async () => {
+            const stakedAmount = await toWei(20, stakableTokenInstance);
+            const firstRewardsAmount = await toWei(
+                10,
+                firstRewardTokenInstance
+            );
+            const secondRewardsAmount = await toWei(
+                20,
+                secondRewardTokenInstance
+            );
+            const {
+                startingTimestamp,
+                endingTimestamp,
+                erc20DistributionInstance,
+            } = await initializeDistribution({
+                from: ownerAddress,
+                erc20DistributionFactoryInstance,
+                stakableToken: stakableTokenInstance,
+                rewardTokens: [
+                    firstRewardTokenInstance,
+                    secondRewardTokenInstance,
+                ],
+                rewardAmounts: [firstRewardsAmount, secondRewardsAmount],
+                duration: 10,
+            });
+            await initializeStaker({
+                erc20DistributionInstance,
+                stakableTokenInstance,
+                stakerAddress: firstStakerAddress,
+                stakableAmount: stakedAmount,
+            });
+            await fastForwardTo({ timestamp: startingTimestamp });
+            // make sure the staking operation happens as soon as possible
+            await stakeAtTimestamp(
+                erc20DistributionInstance,
+                firstStakerAddress,
+                stakedAmount,
+                startingTimestamp
+            );
+            await fastForwardTo({ timestamp: endingTimestamp.add(new BN(1)) });
+            // staker staked for all of the campaign's duration
+            await erc20DistributionInstance.claim(
+                [0, secondRewardsAmount],
+                firstStakerAddress,
+                { from: firstStakerAddress }
+            );
+            expect(
+                await firstRewardTokenInstance.balanceOf(firstStakerAddress)
+            ).to.be.equalBn(ZERO_BN);
+            expect(
+                await secondRewardTokenInstance.balanceOf(firstStakerAddress)
+            ).to.be.equalBn(secondRewardsAmount);
+            expect(
+                await firstRewardTokenInstance.balanceOf(
+                    erc20DistributionInstance.address
+                )
+            ).to.be.equalBn(firstRewardsAmount);
+            expect(
+                await secondRewardTokenInstance.balanceOf(
+                    erc20DistributionInstance.address
+                )
+            ).to.be.equalBn(ZERO_BN);
+        });
+
+        it("should succeed when claiming zero first rewards and part of the second rewards", async () => {
+            const stakedAmount = await toWei(20, stakableTokenInstance);
+            const firstRewardsAmount = await toWei(
+                10,
+                firstRewardTokenInstance
+            );
+            const secondRewardsAmount = await toWei(
+                20,
+                secondRewardTokenInstance
+            );
+            const {
+                erc20DistributionInstance,
+                startingTimestamp,
+                endingTimestamp,
+            } = await initializeDistribution({
+                from: ownerAddress,
+                erc20DistributionFactoryInstance,
+                stakableToken: stakableTokenInstance,
+                rewardTokens: [
+                    firstRewardTokenInstance,
+                    secondRewardTokenInstance,
+                ],
+                rewardAmounts: [firstRewardsAmount, secondRewardsAmount],
+                duration: 10,
+            });
+            await initializeStaker({
+                erc20DistributionInstance,
+                stakableTokenInstance,
+                stakerAddress: firstStakerAddress,
+                stakableAmount: stakedAmount,
+            });
+            await fastForwardTo({ timestamp: startingTimestamp });
+            // make sure the staking operation happens as soon as possible
+            await stakeAtTimestamp(
+                erc20DistributionInstance,
+                firstStakerAddress,
+                stakedAmount,
+                startingTimestamp
+            );
+            await fastForwardTo({ timestamp: endingTimestamp.add(new BN(1)) });
+            // staker staked for all of the campaign's duration, but we only claim half of the first reward
+            const halfFirstRewardsAmount = firstRewardsAmount.div(new BN(2));
+            await erc20DistributionInstance.claim(
+                [halfFirstRewardsAmount, 0],
+                firstStakerAddress,
+                { from: firstStakerAddress }
+            );
+            expect(
+                await firstRewardTokenInstance.balanceOf(firstStakerAddress)
+            ).to.be.equalBn(halfFirstRewardsAmount);
+            expect(
+                await secondRewardTokenInstance.balanceOf(firstStakerAddress)
+            ).to.be.equalBn(ZERO_BN);
+            expect(
+                await firstRewardTokenInstance.balanceOf(
+                    erc20DistributionInstance.address
+                )
+            ).to.be.equalBn(halfFirstRewardsAmount);
+            expect(
+                await secondRewardTokenInstance.balanceOf(
+                    erc20DistributionInstance.address
+                )
+            ).to.be.equalBn(secondRewardsAmount);
+        });
+
+        it("should succeed when claiming zero first reward and all of the second reward", async () => {
+            const stakedAmount = await toWei(20, stakableTokenInstance);
+            const firstRewardsAmount = await toWei(
+                10,
+                firstRewardTokenInstance
+            );
+            const secondRewardsAmount = await toWei(
+                20,
+                secondRewardTokenInstance
+            );
+            const {
+                erc20DistributionInstance,
+                startingTimestamp,
+                endingTimestamp,
+            } = await initializeDistribution({
+                from: ownerAddress,
+                erc20DistributionFactoryInstance,
+                stakableToken: stakableTokenInstance,
+                rewardTokens: [
+                    firstRewardTokenInstance,
+                    secondRewardTokenInstance,
+                ],
+                rewardAmounts: [firstRewardsAmount, secondRewardsAmount],
+                duration: 10,
+            });
+            await initializeStaker({
+                erc20DistributionInstance,
+                stakableTokenInstance,
+                stakerAddress: firstStakerAddress,
+                stakableAmount: stakedAmount,
+            });
+            await fastForwardTo({ timestamp: startingTimestamp });
+            // make sure the staking operation happens as soon as possible
+            await stakeAtTimestamp(
+                erc20DistributionInstance,
+                firstStakerAddress,
+                stakedAmount,
+                startingTimestamp
+            );
+            await fastForwardTo({ timestamp: endingTimestamp.add(new BN(1)) });
+            // staker staked for all of the campaign's duration, but we only claim half of the second reward
+            const halfSecondRewardsAmount = secondRewardsAmount.div(new BN(2));
+            await erc20DistributionInstance.claim(
+                [0, halfSecondRewardsAmount],
+                firstStakerAddress,
+                { from: firstStakerAddress }
+            );
+            expect(
+                await firstRewardTokenInstance.balanceOf(firstStakerAddress)
+            ).to.be.equalBn(ZERO_BN);
+            expect(
+                await secondRewardTokenInstance.balanceOf(firstStakerAddress)
+            ).to.be.equalBn(halfSecondRewardsAmount);
+            expect(
+                await firstRewardTokenInstance.balanceOf(
+                    erc20DistributionInstance.address
+                )
+            ).to.be.equalBn(firstRewardsAmount);
+            expect(
+                await secondRewardTokenInstance.balanceOf(
+                    erc20DistributionInstance.address
+                )
+            ).to.be.equalBn(halfSecondRewardsAmount);
+        });
+
         it("should succeed in claiming two multiple rewards if two stakers stake exactly the same amount at different times", async () => {
             const stakedAmount = await toWei(10, stakableTokenInstance);
             const duration = new BN(10);
+            const firstRewardAmount = await toWei(10, firstRewardTokenInstance);
+            const secondRewardAmount = await toWei(
+                50,
+                secondRewardTokenInstance
+            );
+            const {
+                erc20DistributionInstance,
+                startingTimestamp,
+                endingTimestamp,
+            } = await initializeDistribution({
+                from: ownerAddress,
+                erc20DistributionFactoryInstance,
+                stakableToken: stakableTokenInstance,
+                rewardTokens: [
+                    firstRewardTokenInstance,
+                    secondRewardTokenInstance,
+                ],
+                rewardAmounts: [firstRewardAmount, secondRewardAmount],
+                duration,
+            });
             await initializeStaker({
                 erc20DistributionInstance,
                 stakableTokenInstance,
@@ -137,25 +464,6 @@ contract(
                 stakableTokenInstance,
                 stakerAddress: secondStakerAddress,
                 stakableAmount: stakedAmount,
-            });
-            const firstRewardAmount = await toWei(10, firstRewardTokenInstance);
-            const secondRewardAmount = await toWei(
-                50,
-                secondRewardTokenInstance
-            );
-            const {
-                startingTimestamp,
-                endingTimestamp,
-            } = await initializeDistribution({
-                from: ownerAddress,
-                erc20DistributionInstance,
-                stakableToken: stakableTokenInstance,
-                rewardTokens: [
-                    firstRewardTokenInstance,
-                    secondRewardTokenInstance,
-                ],
-                rewardAmounts: [firstRewardAmount, secondRewardAmount],
-                duration,
             });
             await fastForwardTo({
                 timestamp: startingTimestamp,
@@ -246,6 +554,26 @@ contract(
         it("should succeed in claiming three rewards if three stakers stake exactly the same amount at different times", async () => {
             const stakedAmount = await toWei(10, stakableTokenInstance);
             const duration = new BN(12);
+            const firstRewardAmount = await toWei(12, firstRewardTokenInstance);
+            const secondRewardAmount = await toWei(
+                30,
+                secondRewardTokenInstance
+            );
+            const {
+                erc20DistributionInstance,
+                startingTimestamp,
+                endingTimestamp,
+            } = await initializeDistribution({
+                from: ownerAddress,
+                erc20DistributionFactoryInstance,
+                stakableToken: stakableTokenInstance,
+                rewardTokens: [
+                    firstRewardTokenInstance,
+                    secondRewardTokenInstance,
+                ],
+                rewardAmounts: [firstRewardAmount, secondRewardAmount],
+                duration,
+            });
             await initializeStaker({
                 erc20DistributionInstance,
                 stakableTokenInstance,
@@ -263,25 +591,6 @@ contract(
                 stakableTokenInstance,
                 stakerAddress: thirdStakerAddress,
                 stakableAmount: stakedAmount,
-            });
-            const firstRewardAmount = await toWei(12, firstRewardTokenInstance);
-            const secondRewardAmount = await toWei(
-                30,
-                secondRewardTokenInstance
-            );
-            const {
-                startingTimestamp,
-                endingTimestamp,
-            } = await initializeDistribution({
-                from: ownerAddress,
-                erc20DistributionInstance,
-                stakableToken: stakableTokenInstance,
-                rewardTokens: [
-                    firstRewardTokenInstance,
-                    secondRewardTokenInstance,
-                ],
-                rewardAmounts: [firstRewardAmount, secondRewardAmount],
-                duration,
             });
             await fastForwardTo({
                 timestamp: startingTimestamp,
@@ -419,12 +728,6 @@ contract(
         it("should succeed in claiming a reward if a staker stakes when the distribution has already started", async () => {
             const stakedAmount = await toWei(10, stakableTokenInstance);
             const duration = new BN(10);
-            await initializeStaker({
-                erc20DistributionInstance,
-                stakableTokenInstance,
-                stakerAddress: firstStakerAddress,
-                stakableAmount: stakedAmount,
-            });
             const firstRewardsAmount = await toWei(
                 10,
                 firstRewardTokenInstance
@@ -434,11 +737,12 @@ contract(
                 secondRewardTokenInstance
             );
             const {
+                erc20DistributionInstance,
                 startingTimestamp,
                 endingTimestamp,
             } = await initializeDistribution({
                 from: ownerAddress,
-                erc20DistributionInstance,
+                erc20DistributionFactoryInstance,
                 stakableToken: stakableTokenInstance,
                 rewardTokens: [
                     firstRewardTokenInstance,
@@ -446,6 +750,12 @@ contract(
                 ],
                 rewardAmounts: [firstRewardsAmount, secondRewardsAmount],
                 duration,
+            });
+            await initializeStaker({
+                erc20DistributionInstance,
+                stakableTokenInstance,
+                stakerAddress: firstStakerAddress,
+                stakableAmount: stakedAmount,
             });
             // fast forward to half of the distribution duration
             await fastForwardTo({
@@ -482,15 +792,9 @@ contract(
             ).to.be.equalBn(await toWei("10", secondRewardTokenInstance));
         });
 
-        it("should succeed in claiming 0 rewards if a staker stakes at the last second (literally)", async () => {
+        it("should fail in claiming 0 rewards if a staker stakes at the last second (literally)", async () => {
             const stakedAmount = await toWei(10, stakableTokenInstance);
             const duration = new BN(10);
-            await initializeStaker({
-                erc20DistributionInstance,
-                stakableTokenInstance,
-                stakerAddress: firstStakerAddress,
-                stakableAmount: stakedAmount,
-            });
             const firstRewardsAmount = await toWei(
                 10,
                 firstRewardTokenInstance
@@ -499,9 +803,12 @@ contract(
                 10,
                 secondRewardTokenInstance
             );
-            const { endingTimestamp } = await initializeDistribution({
-                from: ownerAddress,
+            const {
+                endingTimestamp,
                 erc20DistributionInstance,
+            } = await initializeDistribution({
+                from: ownerAddress,
+                erc20DistributionFactoryInstance,
                 stakableToken: stakableTokenInstance,
                 rewardTokens: [
                     firstRewardTokenInstance,
@@ -509,6 +816,12 @@ contract(
                 ],
                 rewardAmounts: [firstRewardsAmount, secondRewardsAmount],
                 duration,
+            });
+            await initializeStaker({
+                erc20DistributionInstance,
+                stakableTokenInstance,
+                stakerAddress: firstStakerAddress,
+                stakableAmount: stakedAmount,
             });
             await fastForwardTo({
                 timestamp: endingTimestamp.sub(new BN(1)),
@@ -528,26 +841,19 @@ contract(
             expect(
                 campaignEndingTimestamp.sub(stakerStartingTimestamp)
             ).to.be.equalBn(ZERO_BN);
-            await erc20DistributionInstance.claimAll(firstStakerAddress, {
-                from: firstStakerAddress,
-            });
-            expect(
-                await firstRewardTokenInstance.balanceOf(firstStakerAddress)
-            ).to.be.equalBn(ZERO_BN);
-            expect(
-                await secondRewardTokenInstance.balanceOf(firstStakerAddress)
-            ).to.be.equalBn(ZERO_BN);
+            try {
+                await erc20DistributionInstance.claimAll(firstStakerAddress, {
+                    from: firstStakerAddress,
+                });
+                throw new Error("should have failed");
+            } catch (error) {
+                expect(error.message).to.contain("SRD23");
+            }
         });
 
         it("should succeed in claiming one rewards if a staker stakes at the last valid distribution second", async () => {
             const stakedAmount = await toWei(10, stakableTokenInstance);
             const duration = new BN(10);
-            await initializeStaker({
-                erc20DistributionInstance,
-                stakableTokenInstance,
-                stakerAddress: firstStakerAddress,
-                stakableAmount: stakedAmount,
-            });
             const firstRewardsAmount = await toWei(
                 10,
                 firstRewardTokenInstance
@@ -556,9 +862,12 @@ contract(
                 20,
                 secondRewardTokenInstance
             );
-            const { endingTimestamp } = await initializeDistribution({
-                from: ownerAddress,
+            const {
+                endingTimestamp,
                 erc20DistributionInstance,
+            } = await initializeDistribution({
+                from: ownerAddress,
+                erc20DistributionFactoryInstance,
                 stakableToken: stakableTokenInstance,
                 rewardTokens: [
                     firstRewardTokenInstance,
@@ -567,10 +876,14 @@ contract(
                 rewardAmounts: [firstRewardsAmount, secondRewardsAmount],
                 duration,
             });
-            await fastForwardTo({
-                timestamp: endingTimestamp.sub(new BN(1)),
+            await initializeStaker({
+                erc20DistributionInstance,
+                stakableTokenInstance,
+                stakerAddress: firstStakerAddress,
+                stakableAmount: stakedAmount,
             });
             const stakerStartingTimestamp = endingTimestamp.sub(new BN(1));
+            await fastForwardTo({ timestamp: stakerStartingTimestamp });
             await stakeAtTimestamp(
                 erc20DistributionInstance,
                 firstStakerAddress,
@@ -587,17 +900,13 @@ contract(
             ).to.be.equalBn(new BN(1));
 
             const firstRewardPerSecond = firstRewardsAmount.div(duration);
+            const secondRewardPerSecond = secondRewardsAmount.div(duration);
             await erc20DistributionInstance.claimAll(firstStakerAddress, {
                 from: firstStakerAddress,
             });
             expect(
                 await firstRewardTokenInstance.balanceOf(firstStakerAddress)
             ).to.be.closeBn(firstRewardPerSecond, MAXIMUM_VARIANCE);
-
-            const secondRewardPerSecond = secondRewardsAmount.div(duration);
-            await erc20DistributionInstance.claimAll(firstStakerAddress, {
-                from: firstStakerAddress,
-            });
             expect(
                 await secondRewardTokenInstance.balanceOf(firstStakerAddress)
             ).to.be.closeBn(secondRewardPerSecond, MAXIMUM_VARIANCE);
@@ -606,18 +915,6 @@ contract(
         it("should succeed in claiming two rewards if two stakers stake exactly the same amount at different times, and then the first staker withdraws a portion of his stake", async () => {
             const stakedAmount = await toWei(10, stakableTokenInstance);
             const duration = new BN(10);
-            await initializeStaker({
-                erc20DistributionInstance,
-                stakableTokenInstance,
-                stakerAddress: firstStakerAddress,
-                stakableAmount: stakedAmount,
-            });
-            await initializeStaker({
-                erc20DistributionInstance,
-                stakableTokenInstance,
-                stakerAddress: secondStakerAddress,
-                stakableAmount: stakedAmount,
-            });
             const firstRewardsAmount = await toWei(
                 10,
                 firstRewardTokenInstance
@@ -629,9 +926,10 @@ contract(
             const {
                 startingTimestamp,
                 endingTimestamp,
+                erc20DistributionInstance,
             } = await initializeDistribution({
                 from: ownerAddress,
-                erc20DistributionInstance,
+                erc20DistributionFactoryInstance,
                 stakableToken: stakableTokenInstance,
                 rewardTokens: [
                     firstRewardTokenInstance,
@@ -639,6 +937,18 @@ contract(
                 ],
                 rewardAmounts: [firstRewardsAmount, secondRewardsAmount],
                 duration,
+            });
+            await initializeStaker({
+                erc20DistributionInstance,
+                stakableTokenInstance,
+                stakerAddress: firstStakerAddress,
+                stakableAmount: stakedAmount,
+            });
+            await initializeStaker({
+                erc20DistributionInstance,
+                stakableTokenInstance,
+                stakerAddress: secondStakerAddress,
+                stakableAmount: stakedAmount,
             });
             await fastForwardTo({
                 timestamp: startingTimestamp,
@@ -755,6 +1065,28 @@ contract(
         it("should succeed in claiming two rewards if two stakers both stake at the last valid distribution second", async () => {
             const stakedAmount = await toWei(10, stakableTokenInstance);
             const duration = new BN(10);
+            const firstRewardsAmount = await toWei(
+                10,
+                firstRewardTokenInstance
+            );
+            const secondRewardsAmount = await toWei(
+                20,
+                secondRewardTokenInstance
+            );
+            const {
+                endingTimestamp,
+                erc20DistributionInstance,
+            } = await initializeDistribution({
+                from: ownerAddress,
+                erc20DistributionFactoryInstance,
+                stakableToken: stakableTokenInstance,
+                rewardTokens: [
+                    firstRewardTokenInstance,
+                    secondRewardTokenInstance,
+                ],
+                rewardAmounts: [firstRewardsAmount, secondRewardsAmount],
+                duration,
+            });
             await initializeStaker({
                 erc20DistributionInstance,
                 stakableTokenInstance,
@@ -766,25 +1098,6 @@ contract(
                 stakableTokenInstance,
                 stakerAddress: secondStakerAddress,
                 stakableAmount: stakedAmount,
-            });
-            const firstRewardsAmount = await toWei(
-                10,
-                firstRewardTokenInstance
-            );
-            const secondRewardsAmount = await toWei(
-                20,
-                secondRewardTokenInstance
-            );
-            const { endingTimestamp } = await initializeDistribution({
-                from: ownerAddress,
-                erc20DistributionInstance,
-                stakableToken: stakableTokenInstance,
-                rewardTokens: [
-                    firstRewardTokenInstance,
-                    secondRewardTokenInstance,
-                ],
-                rewardAmounts: [firstRewardsAmount, secondRewardsAmount],
-                duration,
             });
             await stopMining();
             const stakingTimestamp = endingTimestamp.sub(new BN(1));
@@ -857,12 +1170,6 @@ contract(
         it("should succeed in claiming a reward if a staker stakes at second n and then increases their stake", async () => {
             const stakedAmount = await toWei(10, stakableTokenInstance);
             const duration = new BN(10);
-            await initializeStaker({
-                erc20DistributionInstance,
-                stakableTokenInstance,
-                stakerAddress: firstStakerAddress,
-                stakableAmount: stakedAmount,
-            });
             const firstRewardsAmount = await toWei(
                 10,
                 firstRewardTokenInstance
@@ -875,9 +1182,10 @@ contract(
             const {
                 startingTimestamp,
                 endingTimestamp,
+                erc20DistributionInstance,
             } = await initializeDistribution({
                 from: ownerAddress,
-                erc20DistributionInstance,
+                erc20DistributionFactoryInstance,
                 stakableToken: stakableTokenInstance,
                 rewardTokens: [
                     firstRewardTokenInstance,
@@ -885,6 +1193,12 @@ contract(
                 ],
                 rewardAmounts: [firstRewardsAmount, secondRewardsAmount],
                 duration,
+            });
+            await initializeStaker({
+                erc20DistributionInstance,
+                stakableTokenInstance,
+                stakerAddress: firstStakerAddress,
+                stakableAmount: stakedAmount,
             });
             await fastForwardTo({
                 timestamp: startingTimestamp,
@@ -935,18 +1249,6 @@ contract(
         it("should succeed in claiming two rewards if two staker respectively stake and withdraw at the same second", async () => {
             const stakedAmount = await toWei(10, stakableTokenInstance);
             const duration = new BN(10);
-            await initializeStaker({
-                erc20DistributionInstance,
-                stakableTokenInstance,
-                stakerAddress: firstStakerAddress,
-                stakableAmount: stakedAmount,
-            });
-            await initializeStaker({
-                erc20DistributionInstance,
-                stakableTokenInstance,
-                stakerAddress: secondStakerAddress,
-                stakableAmount: stakedAmount,
-            });
             const firstRewardsAmount = await toWei(
                 10,
                 firstRewardTokenInstance
@@ -958,9 +1260,10 @@ contract(
             const {
                 startingTimestamp,
                 endingTimestamp,
+                erc20DistributionInstance,
             } = await initializeDistribution({
                 from: ownerAddress,
-                erc20DistributionInstance,
+                erc20DistributionFactoryInstance,
                 stakableToken: stakableTokenInstance,
                 rewardTokens: [
                     firstRewardTokenInstance,
@@ -968,6 +1271,18 @@ contract(
                 ],
                 rewardAmounts: [firstRewardsAmount, secondRewardsAmount],
                 duration,
+            });
+            await initializeStaker({
+                erc20DistributionInstance,
+                stakableTokenInstance,
+                stakerAddress: firstStakerAddress,
+                stakableAmount: stakedAmount,
+            });
+            await initializeStaker({
+                erc20DistributionInstance,
+                stakableTokenInstance,
+                stakerAddress: secondStakerAddress,
+                stakableAmount: stakedAmount,
             });
             await fastForwardTo({ timestamp: startingTimestamp });
             await stakeAtTimestamp(
@@ -1050,9 +1365,12 @@ contract(
 
         it("should fail when trying to claim passing an excessive-length amounts array", async () => {
             const duration = new BN(10);
-            const { startingTimestamp } = await initializeDistribution({
-                from: ownerAddress,
+            const {
+                startingTimestamp,
                 erc20DistributionInstance,
+            } = await initializeDistribution({
+                from: ownerAddress,
+                erc20DistributionFactoryInstance,
                 stakableToken: stakableTokenInstance,
                 rewardTokens: [
                     firstRewardTokenInstance,
@@ -1078,9 +1396,12 @@ contract(
 
         it("should fail when trying to claim passing a defective-length amounts array", async () => {
             const duration = new BN(10);
-            const { startingTimestamp } = await initializeDistribution({
-                from: ownerAddress,
+            const {
+                startingTimestamp,
                 erc20DistributionInstance,
+            } = await initializeDistribution({
+                from: ownerAddress,
+                erc20DistributionFactoryInstance,
                 stakableToken: stakableTokenInstance,
                 rewardTokens: [
                     firstRewardTokenInstance,
@@ -1107,18 +1428,6 @@ contract(
         it("should fail when trying to claim only a part of the reward, if the first passed in amount is bigger than allowed", async () => {
             const stakedAmount = await toWei(10, stakableTokenInstance);
             const duration = new BN(10);
-            await initializeStaker({
-                erc20DistributionInstance,
-                stakableTokenInstance,
-                stakerAddress: firstStakerAddress,
-                stakableAmount: stakedAmount,
-            });
-            await initializeStaker({
-                erc20DistributionInstance,
-                stakableTokenInstance,
-                stakerAddress: secondStakerAddress,
-                stakableAmount: stakedAmount,
-            });
             const firstRewardsAmount = await toWei(
                 10,
                 firstRewardTokenInstance
@@ -1130,9 +1439,10 @@ contract(
             const {
                 startingTimestamp,
                 endingTimestamp,
+                erc20DistributionInstance,
             } = await initializeDistribution({
                 from: ownerAddress,
-                erc20DistributionInstance,
+                erc20DistributionFactoryInstance,
                 stakableToken: stakableTokenInstance,
                 rewardTokens: [
                     firstRewardTokenInstance,
@@ -1140,6 +1450,18 @@ contract(
                 ],
                 rewardAmounts: [firstRewardsAmount, secondRewardsAmount],
                 duration,
+            });
+            await initializeStaker({
+                erc20DistributionInstance,
+                stakableTokenInstance,
+                stakerAddress: firstStakerAddress,
+                stakableAmount: stakedAmount,
+            });
+            await initializeStaker({
+                erc20DistributionInstance,
+                stakableTokenInstance,
+                stakerAddress: secondStakerAddress,
+                stakableAmount: stakedAmount,
             });
             await fastForwardTo({ timestamp: startingTimestamp });
             await stakeAtTimestamp(
@@ -1166,18 +1488,6 @@ contract(
         it("should fail when trying to claim only a part of the reward, if the second passed in amount is bigger than allowed", async () => {
             const stakedAmount = await toWei(10, stakableTokenInstance);
             const duration = new BN(10);
-            await initializeStaker({
-                erc20DistributionInstance,
-                stakableTokenInstance,
-                stakerAddress: firstStakerAddress,
-                stakableAmount: stakedAmount,
-            });
-            await initializeStaker({
-                erc20DistributionInstance,
-                stakableTokenInstance,
-                stakerAddress: secondStakerAddress,
-                stakableAmount: stakedAmount,
-            });
             const firstRewardsAmount = await toWei(
                 10,
                 firstRewardTokenInstance
@@ -1189,9 +1499,10 @@ contract(
             const {
                 startingTimestamp,
                 endingTimestamp,
+                erc20DistributionInstance,
             } = await initializeDistribution({
                 from: ownerAddress,
-                erc20DistributionInstance,
+                erc20DistributionFactoryInstance,
                 stakableToken: stakableTokenInstance,
                 rewardTokens: [
                     firstRewardTokenInstance,
@@ -1199,6 +1510,18 @@ contract(
                 ],
                 rewardAmounts: [firstRewardsAmount, secondRewardsAmount],
                 duration,
+            });
+            await initializeStaker({
+                erc20DistributionInstance,
+                stakableTokenInstance,
+                stakerAddress: firstStakerAddress,
+                stakableAmount: stakedAmount,
+            });
+            await initializeStaker({
+                erc20DistributionInstance,
+                stakableTokenInstance,
+                stakerAddress: secondStakerAddress,
+                stakableAmount: stakedAmount,
             });
             await fastForwardTo({ timestamp: startingTimestamp });
             await stakeAtTimestamp(
@@ -1222,18 +1545,6 @@ contract(
         it("should fail when trying to claim only a part of the reward, if the second passed in amount is bigger than allowed", async () => {
             const stakedAmount = await toWei(10, stakableTokenInstance);
             const duration = new BN(10);
-            await initializeStaker({
-                erc20DistributionInstance,
-                stakableTokenInstance,
-                stakerAddress: firstStakerAddress,
-                stakableAmount: stakedAmount,
-            });
-            await initializeStaker({
-                erc20DistributionInstance,
-                stakableTokenInstance,
-                stakerAddress: secondStakerAddress,
-                stakableAmount: stakedAmount,
-            });
             const firstRewardsAmount = await toWei(
                 10,
                 firstRewardTokenInstance
@@ -1245,9 +1556,10 @@ contract(
             const {
                 startingTimestamp,
                 endingTimestamp,
+                erc20DistributionInstance,
             } = await initializeDistribution({
                 from: ownerAddress,
-                erc20DistributionInstance,
+                erc20DistributionFactoryInstance,
                 stakableToken: stakableTokenInstance,
                 rewardTokens: [
                     firstRewardTokenInstance,
@@ -1255,6 +1567,18 @@ contract(
                 ],
                 rewardAmounts: [firstRewardsAmount, secondRewardsAmount],
                 duration,
+            });
+            await initializeStaker({
+                erc20DistributionInstance,
+                stakableTokenInstance,
+                stakerAddress: firstStakerAddress,
+                stakableAmount: stakedAmount,
+            });
+            await initializeStaker({
+                erc20DistributionInstance,
+                stakableTokenInstance,
+                stakerAddress: secondStakerAddress,
+                stakableAmount: stakedAmount,
             });
             await fastForwardTo({ timestamp: startingTimestamp });
             await stakeAtTimestamp(
@@ -1278,18 +1602,6 @@ contract(
         it("should fail when trying to claim only a part of the reward, if the second passed in amount is bigger than allowed", async () => {
             const stakedAmount = await toWei(10, stakableTokenInstance);
             const duration = new BN(10);
-            await initializeStaker({
-                erc20DistributionInstance,
-                stakableTokenInstance,
-                stakerAddress: firstStakerAddress,
-                stakableAmount: stakedAmount,
-            });
-            await initializeStaker({
-                erc20DistributionInstance,
-                stakableTokenInstance,
-                stakerAddress: secondStakerAddress,
-                stakableAmount: stakedAmount,
-            });
             const firstRewardsAmount = await toWei(
                 10,
                 firstRewardTokenInstance
@@ -1301,9 +1613,10 @@ contract(
             const {
                 startingTimestamp,
                 endingTimestamp,
+                erc20DistributionInstance,
             } = await initializeDistribution({
                 from: ownerAddress,
-                erc20DistributionInstance,
+                erc20DistributionFactoryInstance,
                 stakableToken: stakableTokenInstance,
                 rewardTokens: [
                     firstRewardTokenInstance,
@@ -1311,6 +1624,18 @@ contract(
                 ],
                 rewardAmounts: [firstRewardsAmount, secondRewardsAmount],
                 duration,
+            });
+            await initializeStaker({
+                erc20DistributionInstance,
+                stakableTokenInstance,
+                stakerAddress: firstStakerAddress,
+                stakableAmount: stakedAmount,
+            });
+            await initializeStaker({
+                erc20DistributionInstance,
+                stakableTokenInstance,
+                stakerAddress: secondStakerAddress,
+                stakableAmount: stakedAmount,
             });
             await fastForwardTo({ timestamp: startingTimestamp });
             await stakeAtTimestamp(
@@ -1334,18 +1659,6 @@ contract(
         it("should succeed in claiming specific amounts under the right conditions", async () => {
             const stakedAmount = await toWei(10, stakableTokenInstance);
             const duration = new BN(10);
-            await initializeStaker({
-                erc20DistributionInstance,
-                stakableTokenInstance,
-                stakerAddress: firstStakerAddress,
-                stakableAmount: stakedAmount,
-            });
-            await initializeStaker({
-                erc20DistributionInstance,
-                stakableTokenInstance,
-                stakerAddress: secondStakerAddress,
-                stakableAmount: stakedAmount,
-            });
             const firstRewardsAmount = await toWei(
                 10,
                 firstRewardTokenInstance
@@ -1357,9 +1670,10 @@ contract(
             const {
                 startingTimestamp,
                 endingTimestamp,
+                erc20DistributionInstance,
             } = await initializeDistribution({
                 from: ownerAddress,
-                erc20DistributionInstance,
+                erc20DistributionFactoryInstance,
                 stakableToken: stakableTokenInstance,
                 rewardTokens: [
                     firstRewardTokenInstance,
@@ -1367,6 +1681,18 @@ contract(
                 ],
                 rewardAmounts: [firstRewardsAmount, secondRewardsAmount],
                 duration,
+            });
+            await initializeStaker({
+                erc20DistributionInstance,
+                stakableTokenInstance,
+                stakerAddress: firstStakerAddress,
+                stakableAmount: stakedAmount,
+            });
+            await initializeStaker({
+                erc20DistributionInstance,
+                stakableTokenInstance,
+                stakerAddress: secondStakerAddress,
+                stakableAmount: stakedAmount,
             });
             await fastForwardTo({ timestamp: startingTimestamp });
             await stakeAtTimestamp(
@@ -1392,18 +1718,6 @@ contract(
         it("should succeed in claiming specific amounts to a foreign address under the right conditions", async () => {
             const stakedAmount = await toWei(10, stakableTokenInstance);
             const duration = new BN(10);
-            await initializeStaker({
-                erc20DistributionInstance,
-                stakableTokenInstance,
-                stakerAddress: firstStakerAddress,
-                stakableAmount: stakedAmount,
-            });
-            await initializeStaker({
-                erc20DistributionInstance,
-                stakableTokenInstance,
-                stakerAddress: secondStakerAddress,
-                stakableAmount: stakedAmount,
-            });
             const firstRewardsAmount = await toWei(
                 10,
                 firstRewardTokenInstance
@@ -1415,9 +1729,10 @@ contract(
             const {
                 startingTimestamp,
                 endingTimestamp,
+                erc20DistributionInstance,
             } = await initializeDistribution({
                 from: ownerAddress,
-                erc20DistributionInstance,
+                erc20DistributionFactoryInstance,
                 stakableToken: stakableTokenInstance,
                 rewardTokens: [
                     firstRewardTokenInstance,
@@ -1425,6 +1740,18 @@ contract(
                 ],
                 rewardAmounts: [firstRewardsAmount, secondRewardsAmount],
                 duration,
+            });
+            await initializeStaker({
+                erc20DistributionInstance,
+                stakableTokenInstance,
+                stakerAddress: firstStakerAddress,
+                stakableAmount: stakedAmount,
+            });
+            await initializeStaker({
+                erc20DistributionInstance,
+                stakableTokenInstance,
+                stakerAddress: secondStakerAddress,
+                stakableAmount: stakedAmount,
             });
             await fastForwardTo({ timestamp: startingTimestamp });
             await stakeAtTimestamp(
