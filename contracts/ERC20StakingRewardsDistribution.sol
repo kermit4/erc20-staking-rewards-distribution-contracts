@@ -292,7 +292,7 @@ contract ERC20StakingRewardsDistribution {
             StakerRewardInfo storage _stakerRewardInfo =
                 _staker.rewardInfo[_reward.token];
             if (totalStakedTokensAmount == 0) {
-                _reward.recoverable += ((_lastPeriodDuration *
+                _reward.recoverableSeconds += ((_lastPeriodDuration *
                     (_reward.amount - _reward.claimed)) /
                     (endingTimestamp - lastConsolidationTimestamp));
                 // no need to update the reward per staked token since in this period
