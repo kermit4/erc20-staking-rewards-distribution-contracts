@@ -1,3 +1,4 @@
+require("../../utils/assertion.js"); 
 const BN = require("bn.js");
 const { expect } = require("chai");
 const {
