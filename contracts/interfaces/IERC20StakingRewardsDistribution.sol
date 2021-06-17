@@ -50,8 +50,6 @@ interface IERC20StakingRewardsDistribution {
         view
         returns (uint256[] memory);
 
-    function updateRewardAmounts() external;
-
     function renounceOwnership() external;
 
     function transferOwnership(address _newOwner) external;
