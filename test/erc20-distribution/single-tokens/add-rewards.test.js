@@ -56,19 +56,26 @@ contract(
                 rewardAmounts: ["10", "1"],
                 duration: 10,
             });
+            await firstRewardTokenInstance.approve(erc20DistributionInstance.address, 60);
             const addRewards = await erc20DistributionInstance.addRewards(
-                firstStakerAddress, 
+                firstRewardTokenInstance.address,
                 1
             );
+            console.log("zzzzz erc20DistributionInstance.owner");
+            console.log(await erc20DistributionInstance.owner());
+            console.log("zzzzzz addRewards");
             console.log(addRewards);
             expectEvent(addRewards, "UpdatedRewards", {
             });
-            const rewards  = erc20DistributionInstance.rewards;
-            console.log(rewards);
-            const reward = rewards[rewards.length-1];
+            const reward = await erc20DistributionInstance.rewards(0);
+//            console.log("zzzzzz rewards");
+ //           console.log(rewards.length);
+  //          console.log(rewards);
+   //         const reward = rewards[rewards.length-1];
+            console.log("zzzzzz reward");
             console.log(reward);
-            assert.equal(reward.amount,1);
-            assert.equal(reward.token,firstStakerAddress);
+            assert.equal(reward.token, firstRewardTokenInstance.address);
+            assert.equal(reward.amount, 1);
         });
     }
 );
