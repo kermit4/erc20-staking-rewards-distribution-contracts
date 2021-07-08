@@ -11,8 +11,8 @@
         "/build/ERC20StakingRewardsDistributionFactory.json"
     ],
     "scripts": {
-        "lint:eslint": "eslint \"test/**/*.js\"",
-        "lint:prettier": "prettier -l contracts/**/*.sol && prettier -l test/**/*.js",
+        "lint:eslint": "find test -name '*.js' -exec eslint {} +",
+        "lint:prettier": "find contracts test \\( -name '*.sol' -o -name '*.js' \\) -exec prettier -l {} +",
         "lint:commit-message": "commitlint -e",
         "lint": "yarn lint:eslint && yarn lint:prettier",
         "test": "find test -type f -name '*.js' \\( -exec node -c {} \\; -o \\( -print -quit \\)  \\)  |grep --quiet . || truffle test --runner-output-only",
