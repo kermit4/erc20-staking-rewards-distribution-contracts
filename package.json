@@ -15,7 +15,7 @@
         "lint:prettier": "prettier -l contracts/**/*.sol && prettier -l test/**/*.js",
         "lint:commit-message": "commitlint -e",
         "lint": "yarn lint:eslint && yarn lint:prettier",
-        "test": "truffle test --runner-output-only",
+        "test": "find test -type f -name '*.js' \\( -exec node -c {} \\; -o \\( -print -quit \\)  \\)  |grep --quiet . || truffle test --runner-output-only",
         "test:coverage": "truffle run coverage",
         "test:gasreport": "truffle test --gas-report",
         "compile": "truffle compile",
