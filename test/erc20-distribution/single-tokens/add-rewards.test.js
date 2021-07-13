@@ -1,8 +1,8 @@
 require("../../utils/assertion.js"); 
-const BN = require("bn.js");
+//const BN = require("bn.js");
 const {
     expectEvent,
-    expectRevert,
+ //   expectRevert,
 } = require("@openzeppelin/test-helpers");
 const { expect } = require("chai");
 const { initializeDistribution } = require("../../utils");
@@ -24,8 +24,9 @@ contract(
             firstRewardTokenInstance,
             secondRewardTokenInstance,
             stakableTokenInstance,
-            ownerAddress,
-            firstStakerAddress;
+            ownerAddress
+           // ,firstStakerAddress
+            ;
 
         beforeEach(async () => {
             const accounts = await web3.eth.getAccounts();
@@ -37,11 +38,11 @@ contract(
                 erc20DistributionInstance.address,
                 { from: ownerAddress }
             );
-            firstStakerAddress = accounts[1];
+            //firstStakerAddress = accounts[1];
             firstRewardTokenInstance = await FirstRewardERC20.new();
             secondRewardTokenInstance = await SecondRewardERC20.new();
             stakableTokenInstance = await FirstStakableERC20.new();
-            firstStakerAddress = accounts[1];
+            //firstStakerAddress = accounts[1];
         });
 
         it("should addRewards", async () => {
@@ -65,8 +66,31 @@ contract(
             expectEvent(addRewards, "UpdatedRewards", {
             });
             const reward = await erc20DistributionInstance.rewards(0);
-            assert.equal(reward.token, firstRewardTokenInstance.address);
-            assert.equal(reward.amount.toNumber(), 12);
+            expect(reward.token).to.be.equal(firstRewardTokenInstance.address);
+            expect(reward.amount.toNumber()).to.be.equal(12);
+        });
+        it("should not addRewards with unsupported token", async () => {
+            const { erc20DistributionInstance } = await initializeDistribution({
+                from: ownerAddress,
+                erc20DistributionFactoryInstance,
+                stakableToken: stakableTokenInstance,
+                rewardTokens: [
+                    secondRewardTokenInstance,
+                ],
+                rewardAmounts: ["10"],
+                duration: 10,
+            });
+            await firstRewardTokenInstance.mint(ownerAddress, 60);
+            await firstRewardTokenInstance.approve(erc20DistributionInstance.address, 60);
+            const addRewards = await erc20DistributionInstance.addRewards(
+                firstRewardTokenInstance.address,
+                2
+            );
+            expectEvent(addRewards, "UpdatedRewards", {
+            });
+            const reward = await erc20DistributionInstance.rewards(0);
+            expect(reward.token).to.not.be.equal(firstRewardTokenInstance.address);
+            expect(reward.amount.toNumber()).to.not.be.equal(12);
         });
     }
 );
