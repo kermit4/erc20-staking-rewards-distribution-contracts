@@ -1,9 +1,7 @@
 #!/bin/bash
-unset tdir
-[[ $1 ]] || tdir=test
+tdir=""
 set -e
-find "$@" > /dev/null
-! find $tdir "$@" -type f -name '*.js' \( -exec node -c {} \; -o \( -print -quit \)  \)  | 
-    grep --quiet .
-! find $tdir "$@" -type f -name '*.js' \( -exec truffle test --runner-output-only {} \; -o \( -printf "%p failed\n" -quit \)  \)  | 
-    grep .
+[[ $1 ]] || tdir=test
+find $tdir "$@" > /dev/null
+find $tdir "$@" -type f -name '*.js' -print0 | xargs -0 -n 1 node -c
+find $tdir "$@" -type f -name '*.js' -print0 | xargs -0 -n 1 truffle test --runner-output-only 
