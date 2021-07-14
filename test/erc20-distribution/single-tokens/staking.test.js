@@ -1,4 +1,4 @@
-require("../../utils/assertion.js"); 
+require("../../utils/assertion.js");
 const { expect } = require("chai");
 const {
     initializeDistribution,
