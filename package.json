@@ -13,6 +13,7 @@
     "scripts": {
         "lint:eslint": "find test -name '*.js' -exec eslint {} +",
         "lint:prettier": "find contracts test \\( -name '*.sol' -o -name '*.js' \\) -exec prettier -l {} +",
+        "lint:prettier_write": "find contracts test \\( -name '*.sol' -o -name '*.js' \\) -exec prettier -w {} +",
         "lint:commit-message": "commitlint -e",
         "lint": "yarn lint:eslint && yarn lint:prettier",
         "test": "./test.bash ",

@@ -26,10 +26,10 @@ const FirstRewardERC20 = artifacts.require("FirstRewardERC20");
 const SecondRewardERC20 = artifacts.require("SecondRewardERC20");
 const FirstStakableERC20 = artifacts.require("FirstStakableERC20");
 function getRowNum() {
-        let e = new Error();
-        e = e.stack.split("\n")[2].split(":");
-        e.pop();
-        return e.pop();
+    let e = new Error();
+    e = e.stack.split("\n")[2].split(":");
+    e.pop();
+    return e.pop();
 }
 
 contract(
@@ -445,7 +445,7 @@ contract(
                 50,
                 secondRewardTokenInstance
             );
-            console.log( getRowNum());
+            console.log(getRowNum());
             const {
                 erc20DistributionInstance,
                 startingTimestamp,
@@ -461,21 +461,37 @@ contract(
                 rewardAmounts: [firstRewardAmount, secondRewardAmount],
                 duration,
             });
-            console.log( getRowNum());
+            console.log(getRowNum());
             await initializeStaker({
                 erc20DistributionInstance,
                 stakableTokenInstance,
                 stakerAddress: firstStakerAddress,
                 stakableAmount: stakedAmount,
             });
-            console.log( getRowNum());
+            console.log(getRowNum());
             await initializeStaker({
                 erc20DistributionInstance,
                 stakableTokenInstance,
                 stakerAddress: secondStakerAddress,
                 stakableAmount: stakedAmount,
             });
-            console.log( getRowNum()); console.log((await erc20DistributionInstance.claimableRewards(firstStakerAddress, { from: firstStakerAddress, })).toString()); console.log((await erc20DistributionInstance.claimableRewards(secondStakerAddress, { from: secondStakerAddress, })).toString());
+            console.log(getRowNum());
+            console.log(
+                (
+                    await erc20DistributionInstance.claimableRewards(
+                        firstStakerAddress,
+                        { from: firstStakerAddress }
+                    )
+                ).toString()
+            );
+            console.log(
+                (
+                    await erc20DistributionInstance.claimableRewards(
+                        secondStakerAddress,
+                        { from: secondStakerAddress }
+                    )
+                ).toString()
+            );
             await fastForwardTo({
                 timestamp: startingTimestamp,
             });
@@ -486,48 +502,78 @@ contract(
                 stakedAmount,
                 startingTimestamp
             );
-            console.log( getRowNum());
-            console.log((await erc20DistributionInstance.claimableRewards(firstStakerAddress, { from: firstStakerAddress, })).toString()); console.log((await erc20DistributionInstance.claimableRewards(secondStakerAddress, { from: secondStakerAddress, })).toString());
-            console.log( getRowNum());
+            console.log(getRowNum());
+            console.log(
+                (
+                    await erc20DistributionInstance.claimableRewards(
+                        firstStakerAddress,
+                        { from: firstStakerAddress }
+                    )
+                ).toString()
+            );
+            console.log(
+                (
+                    await erc20DistributionInstance.claimableRewards(
+                        secondStakerAddress,
+                        { from: secondStakerAddress }
+                    )
+                ).toString()
+            );
+            console.log(getRowNum());
             const firstStakerStartingTimestamp = await getEvmTimestamp();
             expect(firstStakerStartingTimestamp).to.be.equalBn(
                 startingTimestamp
             );
             // make half of the distribution time pass
-            console.log( getRowNum());
+            console.log(getRowNum());
             await fastForwardTo({
                 timestamp: startingTimestamp.add(new BN(5)),
             });
-            console.log( getRowNum());
+            console.log(getRowNum());
             await stakeAtTimestamp(
                 erc20DistributionInstance,
                 secondStakerAddress,
                 stakedAmount,
                 startingTimestamp.add(new BN(5))
             );
-            console.log((await erc20DistributionInstance.claimableRewards(firstStakerAddress, { from: firstStakerAddress, })).toString()); console.log((await erc20DistributionInstance.claimableRewards(secondStakerAddress, { from: secondStakerAddress, })).toString());
+            console.log(
+                (
+                    await erc20DistributionInstance.claimableRewards(
+                        firstStakerAddress,
+                        { from: firstStakerAddress }
+                    )
+                ).toString()
+            );
+            console.log(
+                (
+                    await erc20DistributionInstance.claimableRewards(
+                        secondStakerAddress,
+                        { from: secondStakerAddress }
+                    )
+                ).toString()
+            );
             const secondStakerStartingTimestamp = await getEvmTimestamp();
             expect(secondStakerStartingTimestamp).to.be.equalBn(
                 startingTimestamp.add(new BN(5))
             );
-            console.log( getRowNum());
+            console.log(getRowNum());
             await fastForwardTo({ timestamp: endingTimestamp });
             const onchainStartingTimestamp = await erc20DistributionInstance.startingTimestamp();
-            console.log( getRowNum());
+            console.log(getRowNum());
             const onchainEndingTimestamp = await erc20DistributionInstance.endingTimestamp();
-            console.log( getRowNum());
+            console.log(getRowNum());
             expect(onchainStartingTimestamp).to.be.equalBn(startingTimestamp);
             expect(onchainEndingTimestamp).to.be.equalBn(endingTimestamp);
             expect(
                 onchainEndingTimestamp.sub(onchainStartingTimestamp)
             ).to.be.equalBn(duration);
             // first staker staked for 10 seconds
-            console.log( getRowNum());
+            console.log(getRowNum());
             expect(
                 onchainEndingTimestamp.sub(firstStakerStartingTimestamp)
             ).to.be.equalBn(new BN(10));
             // second staker staked for 5 seconds
-            console.log( getRowNum());
+            console.log(getRowNum());
             expect(
                 onchainEndingTimestamp.sub(secondStakerStartingTimestamp)
             ).to.be.equalBn(new BN(5));
@@ -545,27 +591,44 @@ contract(
                 .mul(new BN(5))
                 .add(secondRewardPerSecond.mul(new BN(5)).div(new BN(2)));
             // the second staker had half of the rewards for 5 seconds
-            console.log( getRowNum());
+            console.log(getRowNum());
             const expectedFirstSecondStakerReward = firstRewardPerSecond
                 .div(new BN(2))
                 .mul(new BN(5));
-            console.log( getRowNum());
+            console.log(getRowNum());
             const expectedSecondSecondStakerReward = secondRewardPerSecond
                 .div(new BN(2))
                 .mul(new BN(5));
             // first staker claiming/balance checking
-            console.log( getRowNum());
-            console.log((await erc20DistributionInstance.claimableRewards(firstStakerAddress, { from: firstStakerAddress, })).toString()); console.log((await erc20DistributionInstance.claimableRewards(secondStakerAddress, { from: secondStakerAddress, })).toString());
+            console.log(getRowNum());
+            console.log(
+                (
+                    await erc20DistributionInstance.claimableRewards(
+                        firstStakerAddress,
+                        { from: firstStakerAddress }
+                    )
+                ).toString()
+            );
+            console.log(
+                (
+                    await erc20DistributionInstance.claimableRewards(
+                        secondStakerAddress,
+                        { from: secondStakerAddress }
+                    )
+                ).toString()
+            );
             await erc20DistributionInstance.claimAll(firstStakerAddress, {
                 from: firstStakerAddress,
             });
-            console.log("last err\n" + await erc20DistributionInstance.lasterr());
-            console.log('expectedFirstFirstStakerReward');
+            console.log(
+                "last err\n" + (await erc20DistributionInstance.lasterr())
+            );
+            console.log("expectedFirstFirstStakerReward");
             console.log(expectedFirstFirstStakerReward.toString());
             expect(
                 await firstRewardTokenInstance.balanceOf(firstStakerAddress)
             ).to.be.equalBn(expectedFirstFirstStakerReward);
-            console.log( getRowNum());
+            console.log(getRowNum());
             expect(
                 await secondRewardTokenInstance.balanceOf(firstStakerAddress)
             ).to.be.equalBn(expectedSecondFirstStakerReward);
@@ -576,7 +639,7 @@ contract(
             expect(
                 await firstRewardTokenInstance.balanceOf(secondStakerAddress)
             ).to.be.equalBn(expectedFirstSecondStakerReward);
-            console.log( getRowNum());
+            console.log(getRowNum());
             expect(
                 await secondRewardTokenInstance.balanceOf(secondStakerAddress)
             ).to.be.equalBn(expectedSecondSecondStakerReward);
@@ -935,7 +998,9 @@ contract(
             await erc20DistributionInstance.claimAll(firstStakerAddress, {
                 from: firstStakerAddress,
             });
-            console.log("last err\n" + await erc20DistributionInstance.lasterr());
+            console.log(
+                "last err\n" + (await erc20DistributionInstance.lasterr())
+            );
             expect(
                 await firstRewardTokenInstance.balanceOf(firstStakerAddress)
             ).to.be.closeBn(firstRewardsAmount, MAXIMUM_VARIANCE);

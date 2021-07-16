@@ -230,7 +230,6 @@ contract(
             ).to.be.equalBn(ZERO_BN);
         });
 
-        
         it("should recover half of the rewards when a staker stakes for a third of the distribution duration, right in the middle", async () => {
             const rewardTokens = [
                 firstRewardsTokenInstance,

@@ -59,21 +59,26 @@ contract ERC20StakingRewardsDistribution {
         uint256 stake;
         mapping(address => StakerRewardInfo) rewardInfo;
     }
-function uint2str(uint _i) internal pure returns (string memory _uintAsString) {
+
+    function uint2str(uint256 _i)
+        internal
+        pure
+        returns (string memory _uintAsString)
+    {
         if (_i == 0) {
             return "0";
         }
-        uint j = _i;
-        uint len;
+        uint256 j = _i;
+        uint256 len;
         while (j != 0) {
             len++;
             j /= 10;
         }
         bytes memory bstr = new bytes(len);
-        uint k = len;
+        uint256 k = len;
         while (_i != 0) {
-            k = k-1;
-            uint8 temp = (48 + uint8(_i - _i / 10 * 10));
+            k = k - 1;
+            uint8 temp = (48 + uint8(_i - (_i / 10) * 10));
             bytes1 b1 = bytes1(temp);
             bstr[k] = b1;
             _i /= 10;
@@ -97,7 +102,7 @@ function uint2str(uint _i) internal pure returns (string memory _uintAsString) {
     uint256 public totalStakedTokensAmount;
     uint256 public stakingCap;
 
-            //event Earned(address token ,uint256 rewardPerToken ,uint256 staked);
+    //event Earned(address token ,uint256 rewardPerToken ,uint256 staked);
     event OwnershipTransferred(
         address indexed previousOwner,
         address indexed newOwner
@@ -202,8 +207,7 @@ function uint2str(uint _i) internal pure returns (string memory _uintAsString) {
             Reward storage _reward = rewards[_i];
             // recoverable rewards are going to be recovered in this tx (if it does not revert),
             // so we add them to the claimed rewards right now
-            if(_reward.amountRemaining == 0) 
-                continue;
+            if (_reward.amountRemaining == 0) continue;
             _atLeastOneNonZeroRecovery = true;
             _recoveredUnassignedRewards[_i] = _reward.amountRemaining;
             IERC20(_reward.token).safeTransfer(owner, _reward.amountRemaining);
@@ -224,7 +228,9 @@ function uint2str(uint _i) internal pure returns (string memory _uintAsString) {
         }
         consolidateReward();
         Staker storage _staker = stakers[msg.sender];
-        lasterr = string(abi.encodePacked(lasterr, " staking ", uint2str(_amount),"\n"));
+        lasterr = string(
+            abi.encodePacked(lasterr, " staking ", uint2str(_amount), "\n")
+        );
         _staker.stake += _amount;
         totalStakedTokensAmount += _amount;
         stakableToken.safeTransferFrom(msg.sender, address(this), _amount);
@@ -284,13 +290,12 @@ function uint2str(uint _i) internal pure returns (string memory _uintAsString) {
         emit log("zzzi4");
         for (uint256 _i; _i < rewards.length; _i++) {
             Reward storage _reward = rewards[_i];
-        emit log("zzzi5");
+            emit log("zzzi5");
             StakerRewardInfo storage _stakerRewardInfo =
                 _staker.rewardInfo[_reward.token];
             uint256 _claimableReward =
                 _stakerRewardInfo.earned - _stakerRewardInfo.claimed;
-            if (_claimableReward == 0) 
-                continue;
+            if (_claimableReward == 0) continue;
             _atLeastOneNonZeroClaim = true;
             _stakerRewardInfo.claimed += _claimableReward;
             _reward.claimed += _claimableReward;
@@ -315,39 +320,72 @@ function uint2str(uint _i) internal pure returns (string memory _uintAsString) {
         uint256 _unconsolidatedDuration =
             uint256(endingTimestamp - lastConsolidationTimestamp);
         Staker storage _staker = stakers[msg.sender];
-            lasterr = string(abi.encodePacked(lasterr, " ", uint2str(_consolidationTimestamp)));
-            lasterr = string(abi.encodePacked(lasterr, " ", uint2str(_lastPeriodDuration)));
+        lasterr = string(
+            abi.encodePacked(lasterr, " ", uint2str(_consolidationTimestamp))
+        );
+        lasterr = string(
+            abi.encodePacked(lasterr, " ", uint2str(_lastPeriodDuration))
+        );
         lastConsolidationTimestamp = _consolidationTimestamp;
         for (uint256 _i; _i < rewards.length; _i++) {
             lasterr = string(abi.encodePacked(lasterr, " ", uint2str(_i)));
             Reward storage _reward = rewards[_i];
             StakerRewardInfo storage _stakerRewardInfo =
                 _staker.rewardInfo[_reward.token];
-            lasterr = string(abi.encodePacked(lasterr, " earned before/after calculation ", uint2str(_stakerRewardInfo.earned)));
+            lasterr = string(
+                abi.encodePacked(
+                    lasterr,
+                    " earned before/after calculation ",
+                    uint2str(_stakerRewardInfo.earned)
+                )
+            );
             uint256 _thisPerStakedToken;
-            if (_unconsolidatedDuration * totalStakedTokensAmount > 0) { 
-                _thisPerStakedToken = 
-                    _lastPeriodDuration 
-                    * _reward.amountRemaining
-                    * MULTIPLIER
-                    / totalStakedTokensAmount
-                    / _unconsolidatedDuration
-                    ;
+            if (_unconsolidatedDuration * totalStakedTokensAmount > 0) {
+                _thisPerStakedToken =
+                    (_lastPeriodDuration *
+                        _reward.amountRemaining *
+                        MULTIPLIER) /
+                    totalStakedTokensAmount /
+                    _unconsolidatedDuration;
                 _reward.perStakedToken += _thisPerStakedToken;
             }
-            _reward.amountRemaining -= _thisPerStakedToken*totalStakedTokensAmount / MULTIPLIER;
+            _reward.amountRemaining -=
+                (_thisPerStakedToken * totalStakedTokensAmount) /
+                MULTIPLIER;
 
-            _stakerRewardInfo.earned += 
-                _staker.stake 
-                * (_reward.perStakedToken - _stakerRewardInfo.consolidatedPerStakedToken) 
-                / MULTIPLIER;
-            lasterr = string(abi.encodePacked(lasterr, "/", uint2str(_stakerRewardInfo.earned)));
-            lasterr = string(abi.encodePacked(lasterr, " ", uint2str(_staker.stake)));
-            lasterr = string(abi.encodePacked(lasterr, " of ", uint2str(totalStakedTokensAmount)));
-            lasterr = string(abi.encodePacked(lasterr, " _reward.perStakedToken  ", uint2str(_reward.perStakedToken)));
-//            emit Earned(_reward.token,thisPerTokenReward,_staker.stake);
-emit LogN(99999);
-            _stakerRewardInfo.consolidatedPerStakedToken = _reward.perStakedToken;
+            _stakerRewardInfo.earned +=
+                (_staker.stake *
+                    (_reward.perStakedToken -
+                        _stakerRewardInfo.consolidatedPerStakedToken)) /
+                MULTIPLIER;
+            lasterr = string(
+                abi.encodePacked(
+                    lasterr,
+                    "/",
+                    uint2str(_stakerRewardInfo.earned)
+                )
+            );
+            lasterr = string(
+                abi.encodePacked(lasterr, " ", uint2str(_staker.stake))
+            );
+            lasterr = string(
+                abi.encodePacked(
+                    lasterr,
+                    " of ",
+                    uint2str(totalStakedTokensAmount)
+                )
+            );
+            lasterr = string(
+                abi.encodePacked(
+                    lasterr,
+                    " _reward.perStakedToken  ",
+                    uint2str(_reward.perStakedToken)
+                )
+            );
+            //            emit Earned(_reward.token,thisPerTokenReward,_staker.stake);
+            emit LogN(99999);
+            _stakerRewardInfo.consolidatedPerStakedToken = _reward
+                .perStakedToken;
         }
         lasterr = string(abi.encodePacked(lasterr, "\n"));
     }
@@ -376,16 +414,13 @@ emit LogN(99999);
         returns (uint256[] memory)
     {
         uint256[] memory _outstandingRewards = new uint256[](rewards.length);
-        if (!initialized)
-            return _outstandingRewards;
-        if( block.timestamp < startingTimestamp)
-            return _outstandingRewards;
+        if (!initialized) return _outstandingRewards;
+        if (block.timestamp < startingTimestamp) return _outstandingRewards;
         uint64 _consolidationTimestamp =
             uint64(Math.min(block.timestamp, endingTimestamp));
         uint256 _lastPeriodDuration =
             uint256(_consolidationTimestamp - lastConsolidationTimestamp);
-        if (_lastPeriodDuration == 0)
-            return _outstandingRewards;
+        if (_lastPeriodDuration == 0) return _outstandingRewards;
         uint256 _unconsolidatedDuration =
             uint256(endingTimestamp - lastConsolidationTimestamp);
         Staker storage _staker = stakers[_account];
@@ -393,16 +428,15 @@ emit LogN(99999);
             Reward storage _reward = rewards[_i];
             StakerRewardInfo storage _stakerRewardInfo =
                 _staker.rewardInfo[_reward.token];
-            _outstandingRewards[_i] = (_stakerRewardInfo.earned - _stakerRewardInfo.claimed);
-            if (_staker.stake == 0)
-                continue;
+            _outstandingRewards[_i] = (_stakerRewardInfo.earned -
+                _stakerRewardInfo.claimed);
+            if (_staker.stake == 0) continue;
             _outstandingRewards[_i] +=
-                _staker.stake 
-                * _lastPeriodDuration 
-                * _reward.amountRemaining
-                / totalStakedTokensAmount
-                / _unconsolidatedDuration
-                ;
+                (_staker.stake *
+                    _lastPeriodDuration *
+                    _reward.amountRemaining) /
+                totalStakedTokensAmount /
+                _unconsolidatedDuration;
         }
         return _outstandingRewards;
     }
@@ -455,8 +489,7 @@ emit LogN(99999);
         require(block.timestamp >= endingTimestamp, "SRD12");
         for (uint256 _i = 0; _i < rewards.length; _i++) {
             Reward storage _reward = rewards[_i];
-            if (_reward.token == _rewardToken) 
-                return  _reward.amountRemaining;
+            if (_reward.token == _rewardToken) return _reward.amountRemaining;
         }
         return 0;
     }
