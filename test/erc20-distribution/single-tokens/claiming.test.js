@@ -1103,7 +1103,7 @@ contract(
             );
             expect(postClaimBalance.sub(preClaimBalance)).to.be.closeBn(
                 expectedRemainingReward,
-                MAXIMUM_VARIANCE.mul(new BN(2)),
+                MAXIMUM_VARIANCE.mul(new BN(2))
             );
 
             // At this point all the tokens minus some wei due to integer truncation should
