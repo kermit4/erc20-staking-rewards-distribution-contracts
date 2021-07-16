@@ -39,11 +39,12 @@ import "./interfaces/IERC20StakingRewardsDistributionFactory.sol";
 contract ERC20StakingRewardsDistribution {
     using SafeERC20 for IERC20;
 
-    uint224 constant MULTIPLIER = 2**112;
+    uint224 constant MULTIPLIER = 2**64;
 
     struct Reward {
         address token;
         uint256 amount;
+        uint256 amountRemaining;
         uint256 perStakedToken;
         uint256 recoverableSeconds;
         uint256 claimed;
@@ -59,10 +60,32 @@ contract ERC20StakingRewardsDistribution {
         uint256 stake;
         mapping(address => StakerRewardInfo) rewardInfo;
     }
+function uint2str(uint _i) internal pure returns (string memory _uintAsString) {
+        if (_i == 0) {
+            return "0";
+        }
+        uint j = _i;
+        uint len;
+        while (j != 0) {
+            len++;
+            j /= 10;
+        }
+        bytes memory bstr = new bytes(len);
+        uint k = len;
+        while (_i != 0) {
+            k = k-1;
+            uint8 temp = (48 + uint8(_i - _i / 10 * 10));
+            bytes1 b1 = bytes1(temp);
+            bstr[k] = b1;
+            _i /= 10;
+        }
+        return string(bstr);
+    }
 
     Reward[] public rewards;
     mapping(address => Staker) public stakers;
     uint64 public startingTimestamp;
+    string public lasterr;
     uint64 public endingTimestamp;
     uint64 public secondsDuration;
     uint64 public lastConsolidationTimestamp;
@@ -75,6 +98,7 @@ contract ERC20StakingRewardsDistribution {
     uint256 public totalStakedTokensAmount;
     uint256 public stakingCap;
 
+            //event Earned(address token ,uint256 rewardPerToken ,uint256 staked);
     event OwnershipTransferred(
         address indexed previousOwner,
         address indexed newOwner
@@ -92,6 +116,8 @@ contract ERC20StakingRewardsDistribution {
     event Staked(address indexed staker, uint256 amount);
     event Withdrawn(address indexed withdrawer, uint256 amount);
     event Claimed(address indexed claimer, uint256[] amounts);
+    event log(string msg);
+    event LogN(uint256 n);
     event Recovered(uint256[] amounts);
     event UpdatedRewards(uint256[] amounts);
 
@@ -122,6 +148,7 @@ contract ERC20StakingRewardsDistribution {
                 Reward({
                     token: _rewardTokenAddress,
                     amount: _rewardAmount,
+                    amountRemaining: _rewardAmount,
                     perStakedToken: 0,
                     recoverableSeconds: 0,
                     claimed: 0
@@ -176,8 +203,8 @@ contract ERC20StakingRewardsDistribution {
             Reward storage _reward = rewards[_i];
             // recoverable rewards are going to be recovered in this tx (if it does not revert),
             // so we add them to the claimed rewards right now
-            _reward.claimed += ((_reward.recoverableSeconds * _reward.amount) /
-                (uint256(secondsDuration) * MULTIPLIER));
+            _reward.claimed += ((_reward.recoverableSeconds * _reward.amountRemaining) /
+                (uint256(secondsDuration) ));
             delete _reward.recoverableSeconds;
             uint256 _recoverableRewards =
                 IERC20(_reward.token).balanceOf(address(this)) -
@@ -202,6 +229,7 @@ contract ERC20StakingRewardsDistribution {
         }
         consolidateReward();
         Staker storage _staker = stakers[msg.sender];
+        lasterr = string(abi.encodePacked(lasterr, " staking ", uint2str(_amount),"\n"));
         _staker.stake += _amount;
         totalStakedTokensAmount += _amount;
         stakableToken.safeTransferFrom(msg.sender, address(this), _amount);
@@ -251,23 +279,30 @@ contract ERC20StakingRewardsDistribution {
     }
 
     function claimAll(address _recipient) public onlyStarted {
+        emit log("zzzi1");
         consolidateReward();
+        emit log("zzzi2");
         Staker storage _staker = stakers[msg.sender];
+        emit log("zzzi3");
         uint256[] memory _claimedRewards = new uint256[](rewards.length);
         bool _atLeastOneNonZeroClaim = false;
+        emit log("zzzi4");
         for (uint256 _i; _i < rewards.length; _i++) {
             Reward storage _reward = rewards[_i];
+        emit log("zzzi5");
             StakerRewardInfo storage _stakerRewardInfo =
                 _staker.rewardInfo[_reward.token];
             uint256 _claimableReward =
                 _stakerRewardInfo.earned - _stakerRewardInfo.claimed;
-            if (!_atLeastOneNonZeroClaim && _claimableReward > 0)
-                _atLeastOneNonZeroClaim = true;
+            if (_claimableReward == 0) 
+                continue;
+            _atLeastOneNonZeroClaim = true;
             _stakerRewardInfo.claimed += _claimableReward;
             _reward.claimed += _claimableReward;
             IERC20(_reward.token).safeTransfer(_recipient, _claimableReward);
             _claimedRewards[_i] = _claimableReward;
         }
+        emit log("zzzi6");
         require(_atLeastOneNonZeroClaim, "SRD23");
         emit Claimed(msg.sender, _claimedRewards);
     }
@@ -282,35 +317,44 @@ contract ERC20StakingRewardsDistribution {
             uint64(Math.min(block.timestamp, endingTimestamp));
         uint256 _lastPeriodDuration =
             uint256(_consolidationTimestamp - lastConsolidationTimestamp);
+        uint256 _unconsolidatedDuration =
+            uint256(endingTimestamp - lastConsolidationTimestamp);
         Staker storage _staker = stakers[msg.sender];
+            lasterr = string(abi.encodePacked(lasterr, " ", uint2str(_consolidationTimestamp)));
+            lasterr = string(abi.encodePacked(lasterr, " ", uint2str(_lastPeriodDuration)));
+        lastConsolidationTimestamp = _consolidationTimestamp;
         for (uint256 _i; _i < rewards.length; _i++) {
+            lasterr = string(abi.encodePacked(lasterr, " ", uint2str(_i)));
             Reward storage _reward = rewards[_i];
             StakerRewardInfo storage _stakerRewardInfo =
                 _staker.rewardInfo[_reward.token];
-            if (totalStakedTokensAmount == 0) {
-                _reward.recoverableSeconds += ((_lastPeriodDuration *
-                    (_reward.amount - _reward.claimed)) /
-                    (endingTimestamp - lastConsolidationTimestamp));
-                // no need to update the reward per staked token since in this period
-                // there have been no staked tokens, so no reward has been given out to stakers
-            } else {
-                _reward.perStakedToken += ((((_lastPeriodDuration *
-                    (_reward.amount - _reward.claimed)) /
-                    (endingTimestamp - lastConsolidationTimestamp)) *
-                    MULTIPLIER) / totalStakedTokensAmount);
+            lasterr = string(abi.encodePacked(lasterr, " earned before/after calculation ", uint2str(_stakerRewardInfo.earned)));
+            uint256 _thisPerStakedToken;
+            if (_unconsolidatedDuration * totalStakedTokensAmount > 0) { 
+                _thisPerStakedToken = 
+                    _lastPeriodDuration 
+                    * _reward.amountRemaining
+                    * MULTIPLIER
+                    / totalStakedTokensAmount
+                    / _unconsolidatedDuration
+                    ;
+                _reward.perStakedToken += _thisPerStakedToken;
             }
-            uint256 _rewardSinceLastConsolidation =
-                (_staker.stake *
-                    (_reward.perStakedToken -
-                        _stakerRewardInfo.consolidatedPerStakedToken)) /
-                    MULTIPLIER;
-            if (_rewardSinceLastConsolidation > 0) {
-                _stakerRewardInfo.earned += _rewardSinceLastConsolidation;
-            }
-            _stakerRewardInfo.consolidatedPerStakedToken = _reward
-                .perStakedToken;
+            _reward.amountRemaining -= _thisPerStakedToken*totalStakedTokensAmount / MULTIPLIER;
+
+            _stakerRewardInfo.earned += 
+                _staker.stake 
+                * (_reward.perStakedToken - _stakerRewardInfo.consolidatedPerStakedToken) 
+                / MULTIPLIER;
+            lasterr = string(abi.encodePacked(lasterr, "/", uint2str(_stakerRewardInfo.earned)));
+            lasterr = string(abi.encodePacked(lasterr, " ", uint2str(_staker.stake)));
+            lasterr = string(abi.encodePacked(lasterr, " of ", uint2str(totalStakedTokensAmount)));
+            lasterr = string(abi.encodePacked(lasterr, " _reward.perStakedToken  ", uint2str(_reward.perStakedToken)));
+//            emit Earned(_reward.token,thisPerTokenReward,_staker.stake);
+emit LogN(99999);
+            _stakerRewardInfo.consolidatedPerStakedToken = _reward.perStakedToken;
         }
-        lastConsolidationTimestamp = _consolidationTimestamp;
+        lasterr = string(abi.encodePacked(lasterr, "\n"));
     }
 
     function addRewards(address _token, uint256 _amount) public {
@@ -324,6 +368,7 @@ contract ERC20StakingRewardsDistribution {
                     _amount
                 );
                 rewards[_i].amount += _amount;
+                rewards[_i].amountRemaining += _amount;
             }
             _updatedAmounts[_i] = rewards[_i].amount;
         }
@@ -336,36 +381,33 @@ contract ERC20StakingRewardsDistribution {
         returns (uint256[] memory)
     {
         uint256[] memory _outstandingRewards = new uint256[](rewards.length);
-        if (!initialized || block.timestamp < startingTimestamp) {
-            for (uint256 _i; _i < rewards.length; _i++) {
-                _outstandingRewards[_i] = 0;
-            }
+        if (!initialized)
             return _outstandingRewards;
-        }
-        Staker storage _staker = stakers[_account];
+        if( block.timestamp < startingTimestamp)
+            return _outstandingRewards;
         uint64 _consolidationTimestamp =
             uint64(Math.min(block.timestamp, endingTimestamp));
         uint256 _lastPeriodDuration =
             uint256(_consolidationTimestamp - lastConsolidationTimestamp);
+        if (_lastPeriodDuration == 0)
+            return _outstandingRewards;
+        uint256 _unconsolidatedDuration =
+            uint256(endingTimestamp - lastConsolidationTimestamp);
+        Staker storage _staker = stakers[_account];
         for (uint256 _i; _i < rewards.length; _i++) {
             Reward storage _reward = rewards[_i];
             StakerRewardInfo storage _stakerRewardInfo =
                 _staker.rewardInfo[_reward.token];
-            uint256 _localRewardPerStakedToken = _reward.perStakedToken;
-            if (_lastPeriodDuration > 0 && totalStakedTokensAmount > 0) {
-                _localRewardPerStakedToken += ((((_lastPeriodDuration *
-                    (_reward.amount - _reward.claimed)) /
-                    (endingTimestamp - lastConsolidationTimestamp)) *
-                    MULTIPLIER) / totalStakedTokensAmount);
-            }
-            uint256 _rewardSinceLastConsolidation =
-                (_staker.stake *
-                    (_localRewardPerStakedToken -
-                        _stakerRewardInfo.consolidatedPerStakedToken)) /
-                    MULTIPLIER;
-            _outstandingRewards[_i] =
-                _rewardSinceLastConsolidation +
-                (_stakerRewardInfo.earned - _stakerRewardInfo.claimed);
+            _outstandingRewards[_i] = (_stakerRewardInfo.earned - _stakerRewardInfo.claimed);
+            if (_staker.stake == 0)
+                continue;
+            _outstandingRewards[_i] +=
+                _staker.stake 
+                * _lastPeriodDuration 
+                * _reward.amountRemaining
+                / totalStakedTokensAmount
+                / _unconsolidatedDuration
+                ;
         }
         return _outstandingRewards;
     }
@@ -421,7 +463,7 @@ contract ERC20StakingRewardsDistribution {
                 uint256 _nonRequiredFunds =
                     _reward.claimed +
                         ((_reward.recoverableSeconds * _reward.amount) /
-                            (uint256(secondsDuration) * MULTIPLIER));
+                            (uint256(secondsDuration) ));
                 return
                     IERC20(_reward.token).balanceOf(address(this)) -
                     (_reward.amount - _nonRequiredFunds);
