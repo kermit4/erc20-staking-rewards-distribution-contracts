@@ -46,7 +46,6 @@ contract ERC20StakingRewardsDistribution {
         uint256 amount;
         uint256 amountRemaining;
         uint256 perStakedToken;
-        uint256 recoverableSeconds;
         uint256 claimed;
     }
 
@@ -150,7 +149,6 @@ function uint2str(uint _i) internal pure returns (string memory _uintAsString) {
                     amount: _rewardAmount,
                     amountRemaining: _rewardAmount,
                     perStakedToken: 0,
-                    recoverableSeconds: 0,
                     claimed: 0
                 })
             );
@@ -198,21 +196,18 @@ function uint2str(uint _i) internal pure returns (string memory _uintAsString) {
         consolidateReward();
         uint256[] memory _recoveredUnassignedRewards =
             new uint256[](rewards.length);
+        require(block.timestamp >= endingTimestamp, "SRD12");
         bool _atLeastOneNonZeroRecovery = false;
         for (uint256 _i; _i < rewards.length; _i++) {
             Reward storage _reward = rewards[_i];
             // recoverable rewards are going to be recovered in this tx (if it does not revert),
             // so we add them to the claimed rewards right now
-            _reward.claimed += ((_reward.recoverableSeconds * _reward.amountRemaining) /
-                (uint256(secondsDuration) ));
-            delete _reward.recoverableSeconds;
-            uint256 _recoverableRewards =
-                IERC20(_reward.token).balanceOf(address(this)) -
-                    (_reward.amount - _reward.claimed);
-            if (!_atLeastOneNonZeroRecovery && _recoverableRewards > 0)
-                _atLeastOneNonZeroRecovery = true;
-            _recoveredUnassignedRewards[_i] = _recoverableRewards;
-            IERC20(_reward.token).safeTransfer(owner, _recoverableRewards);
+            if(_reward.amountRemaining == 0) 
+                continue;
+            _atLeastOneNonZeroRecovery = true;
+            _recoveredUnassignedRewards[_i] = _reward.amountRemaining;
+            IERC20(_reward.token).safeTransfer(owner, _reward.amountRemaining);
+            _reward.amountRemaining = 0;
         }
         require(_atLeastOneNonZeroRecovery, "SRD22");
         emit Recovered(_recoveredUnassignedRewards);
@@ -457,17 +452,11 @@ emit LogN(99999);
         view
         returns (uint256)
     {
+        require(block.timestamp >= endingTimestamp, "SRD12");
         for (uint256 _i = 0; _i < rewards.length; _i++) {
             Reward storage _reward = rewards[_i];
-            if (_reward.token == _rewardToken) {
-                uint256 _nonRequiredFunds =
-                    _reward.claimed +
-                        ((_reward.recoverableSeconds * _reward.amount) /
-                            (uint256(secondsDuration) ));
-                return
-                    IERC20(_reward.token).balanceOf(address(this)) -
-                    (_reward.amount - _nonRequiredFunds);
-            }
+            if (_reward.token == _rewardToken) 
+                return  _reward.amountRemaining;
         }
         return 0;
     }
