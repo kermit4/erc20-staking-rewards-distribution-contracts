@@ -452,10 +452,9 @@ contract(
             ).to.be.equalBn(expectedReward);
 
             // the owner should already have some recovered reward tokens from above
-            const expectedRemainingReward = (await toWei(
-                "75",
-                rewardsTokenInstance
-            )).div(new BN(2));
+            const expectedRemainingReward = (
+                await toWei("75", rewardsTokenInstance)
+            ).div(new BN(2));
             expect(
                 await rewardsTokenInstance.balanceOf(ownerAddress)
             ).to.be.equalBn(ZERO_BN);
@@ -590,9 +589,7 @@ contract(
                 await erc20DistributionInstance.recoverableUnassignedReward(
                     rewardsTokenInstance.address
                 )
-            ).to.be.equalBn(
-                rewardsAmount.mul(new BN(3)).div(new BN(8))
-            );
+            ).to.be.equalBn(rewardsAmount.mul(new BN(3)).div(new BN(8)));
             await erc20DistributionInstance.recoverUnassignedRewards();
             // claiming the unassigned rewards that accrued starting from the second withdraw
             expect(
@@ -602,9 +599,7 @@ contract(
             ).to.be.equalBn(ZERO_BN);
             expect(
                 await rewardsTokenInstance.balanceOf(ownerAddress)
-            ).to.be.equalBn(
-                rewardsAmount.mul(new BN(3)).div(new BN(8))
-            );
+            ).to.be.equalBn(rewardsAmount.mul(new BN(3)).div(new BN(8)));
         });
     }
 );

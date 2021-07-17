@@ -73,7 +73,6 @@ contract(
             }
         });
 
-
         it("should fail when passing 0 as seconds duration", async () => {
             try {
                 await initializeDistribution({
