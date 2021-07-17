@@ -9,10 +9,7 @@ const {
     withdrawAtTimestamp,
 } = require("../../utils");
 const { toWei } = require("../../utils/conversion");
-const {
-    fastForwardTo,
-    getEvmTimestamp,
-} = require("../../utils/network");
+const { fastForwardTo, getEvmTimestamp } = require("../../utils/network");
 
 const ERC20StakingRewardsDistribution = artifacts.require(
     "ERC20StakingRewardsDistribution"
