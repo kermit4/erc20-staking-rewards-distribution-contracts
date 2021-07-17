@@ -10,8 +10,6 @@ const {
 } = require("../../utils");
 const { toWei } = require("../../utils/conversion");
 const {
-    stopMining,
-    startMining,
     fastForwardTo,
     getEvmTimestamp,
 } = require("../../utils/network");
@@ -34,8 +32,7 @@ contract(
             secondRewardsTokenInstance,
             stakableTokenInstance,
             ownerAddress,
-            firstStakerAddress,
-            secondStakerAddress;
+            firstStakerAddress;
 
         beforeEach(async () => {
             const accounts = await web3.eth.getAccounts();
@@ -51,7 +48,6 @@ contract(
             secondRewardsTokenInstance = await SecondRewardERC20.new();
             stakableTokenInstance = await FirstStakableERC20.new();
             firstStakerAddress = accounts[1];
-            secondStakerAddress = accounts[2];
         });
 
         it("should recover all of the rewards when the distribution ended and no staker joined", async () => {
@@ -204,9 +200,6 @@ contract(
                 distributionEndingTimestamp.sub(stakingStartingTimestamp)
             ).to.be.equalBn(new BN(5));
             // staker claims their reward
-            const duration = endingTimestamp.sub(startingTimestamp);
-            const firstRewardPerSecond = rewardAmounts[0].div(duration);
-            const secondRewardPerSecond = rewardAmounts[1].div(duration);
             await erc20DistributionInstance.claimAll(firstStakerAddress, {
                 from: firstStakerAddress,
             });

@@ -25,12 +25,6 @@ const ERC20StakingRewardsDistributionFactory = artifacts.require(
 const FirstRewardERC20 = artifacts.require("FirstRewardERC20");
 const SecondRewardERC20 = artifacts.require("SecondRewardERC20");
 const FirstStakableERC20 = artifacts.require("FirstStakableERC20");
-function getRowNum() {
-    let e = new Error();
-    e = e.stack.split("\n")[2].split(":");
-    e.pop();
-    return e.pop();
-}
 
 contract(
     "ERC20StakingRewardsDistribution - Single stakable, multi reward tokens - Claiming",
@@ -906,8 +900,6 @@ contract(
                 campaignEndingTimestamp.sub(stakerStartingTimestamp)
             ).to.be.equalBn(new BN(1));
 
-            const firstRewardPerSecond = firstRewardsAmount.div(duration);
-            const secondRewardPerSecond = secondRewardsAmount.div(duration);
             await erc20DistributionInstance.claimAll(firstStakerAddress, {
                 from: firstStakerAddress,
             });
@@ -1136,8 +1128,6 @@ contract(
                 new BN(1)
             );
 
-            const firstRewardPerSecond = firstRewardsAmount.div(duration);
-            const secondRewardPerSecond = secondRewardsAmount.div(duration);
             // the first staker had half of the rewards for 1 second
             const expectedFirstFirstStakerReward = firstRewardsAmount.div(
                 new BN(2)

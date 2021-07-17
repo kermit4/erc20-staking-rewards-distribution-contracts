@@ -8,7 +8,6 @@ const {
     withdrawAtTimestamp,
     stakeAtTimestamp,
     claimAllAtTimestamp,
-    recoverUnassignedRewardsAtTimestamp,
 } = require("../../utils");
 const { toWei } = require("../../utils/conversion");
 const {

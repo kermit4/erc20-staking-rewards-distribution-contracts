@@ -4,7 +4,7 @@ const { expect } = require("chai");
 const { ZERO_ADDRESS } = require("../../constants");
 const { initializeDistribution } = require("../../utils");
 const { toWei } = require("../../utils/conversion");
-const { getEvmTimestamp, fastForwardTo } = require("../../utils/network");
+const { fastForwardTo } = require("../../utils/network");
 
 const ERC20StakingRewardsDistribution = artifacts.require(
     "ERC20StakingRewardsDistribution"
