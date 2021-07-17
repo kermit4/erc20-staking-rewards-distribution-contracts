@@ -73,65 +73,6 @@ contract(
             }
         });
 
-        it("should fail when passing 0 as a rewards amount", async () => {
-            try {
-                await initializeDistribution({
-                    from: ownerAddress,
-                    erc20DistributionFactoryInstance,
-                    stakableToken: stakableTokenInstance,
-                    rewardTokens: [rewardsTokenInstance],
-                    rewardAmounts: [0],
-                    duration: 10,
-                });
-                throw new Error("should have failed");
-            } catch (error) {
-                expect(error.message).to.contain("SRD05");
-            }
-        });
-
-        it("should fail when passing a lower starting timestamp than the current one", async () => {
-            try {
-                const currentEvmTimestamp = await getEvmTimestamp();
-                const erc20DistributionInstance = await ERC20StakingRewardsDistribution.new(
-                    { from: ownerAddress }
-                );
-                await erc20DistributionInstance.initialize(
-                    [rewardsTokenInstance.address],
-                    stakableTokenInstance.address,
-                    [1],
-                    currentEvmTimestamp.sub(new BN(10)),
-                    currentEvmTimestamp.add(new BN(10)),
-                    false,
-                    0,
-                    { from: ownerAddress }
-                );
-                throw new Error("should have failed");
-            } catch (error) {
-                expect(error.message).to.contain("SRD01");
-            }
-        });
-
-        it("should fail when passing the same starting timestamp as the current one", async () => {
-            try {
-                const currentEvmTimestamp = await getEvmTimestamp();
-                const erc20DistributionInstance = await ERC20StakingRewardsDistribution.new(
-                    { from: ownerAddress }
-                );
-                await erc20DistributionInstance.initialize(
-                    [rewardsTokenInstance.address],
-                    stakableTokenInstance.address,
-                    [1],
-                    currentEvmTimestamp,
-                    currentEvmTimestamp.add(new BN(10)),
-                    false,
-                    0,
-                    { from: ownerAddress }
-                );
-                throw new Error("should have failed");
-            } catch (error) {
-                expect(error.message).to.contain("SRD01");
-            }
-        });
 
         it("should fail when passing 0 as seconds duration", async () => {
             try {

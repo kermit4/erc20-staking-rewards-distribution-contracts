@@ -39,7 +39,7 @@ import "./interfaces/IERC20StakingRewardsDistributionFactory.sol";
 contract ERC20StakingRewardsDistribution {
     using SafeERC20 for IERC20;
 
-    uint224 constant MULTIPLIER = 2**64;
+    uint224 public constant MULTIPLIER = 2**64;
 
     struct Reward {
         address token;
