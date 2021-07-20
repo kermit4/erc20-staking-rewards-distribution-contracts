@@ -71,7 +71,8 @@ contract ERC20StakingRewardsDistributionFactory is Ownable {
             _locked,
             _stakingCap
         );
-        _distribution.transferOwnership(msg.sender);
+        address owner = this.owner();
+        _distribution.transferOwnership(owner);
         distributions.push(_distribution);
         emit DistributionCreated(msg.sender, address(_distribution));
     }
