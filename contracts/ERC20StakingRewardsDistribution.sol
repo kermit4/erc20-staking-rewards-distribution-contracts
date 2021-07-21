@@ -6,7 +6,6 @@ import "@openzeppelin/contracts/utils/math/Math.sol";
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import "./interfaces/IERC20StakingRewardsDistributionFactory.sol";
-import "./lib/FullMath.sol";
 
 /**
  * Errors codes:
@@ -45,7 +44,7 @@ contract ERC20StakingRewardsDistribution {
     struct Reward {
         address token;
         uint256 amount;
-        uint256 unrewarded;
+        uint256 amountRemaining;
         uint256 perStakedToken;
         uint256 claimed;
     }
@@ -124,7 +123,7 @@ contract ERC20StakingRewardsDistribution {
                 Reward({
                     token: _rewardTokenAddress,
                     amount: _rewardAmount,
-                    unrewarded: _rewardAmount,
+                    amountRemaining: _rewardAmount,
                     perStakedToken: 0,
                     claimed: 0
                 })
@@ -179,11 +178,11 @@ contract ERC20StakingRewardsDistribution {
             Reward storage _reward = rewards[_i];
             // recoverable rewards are going to be recovered in this tx (if it does not revert),
             // so we add them to the claimed rewards right now
-            if (_reward.unrewarded == 0) continue;
+            if (_reward.amountRemaining == 0) continue;
             _atLeastOneNonZeroRecovery = true;
-            _recoveredUnassignedRewards[_i] = _reward.unrewarded;
-            IERC20(_reward.token).safeTransfer(owner, _reward.unrewarded);
-            _reward.unrewarded = 0;
+            _recoveredUnassignedRewards[_i] = _reward.amountRemaining;
+            IERC20(_reward.token).safeTransfer(owner, _reward.amountRemaining);
+            _reward.amountRemaining = 0;
         }
         require(_atLeastOneNonZeroRecovery, "SRD22");
         emit Recovered(_recoveredUnassignedRewards);
@@ -291,20 +290,22 @@ contract ERC20StakingRewardsDistribution {
             uint256 _thisPerStakedToken;
             if (_unconsolidatedDuration * totalStakedTokensAmount > 0) {
                 _thisPerStakedToken =
-                    mulDiv(_lastPeriodDuration*_reward.unrewarded,
-                        MULTIPLIER,
-                    totalStakedTokensAmount*
-                    _unconsolidatedDuration);
+                    (_lastPeriodDuration *
+                        _reward.amountRemaining *
+                        MULTIPLIER) /
+                    totalStakedTokensAmount /
+                    _unconsolidatedDuration;
                 _reward.perStakedToken += _thisPerStakedToken;
             }
-            _reward.unrewarded -=
-                mulDiv(_thisPerStakedToken,totalStakedTokensAmount, MULTIPLIER);
+            _reward.amountRemaining -=
+                (_thisPerStakedToken * totalStakedTokensAmount) /
+                MULTIPLIER;
 
             _stakerRewardInfo.earned +=
-                mulDiv( _staker.stake,
+                (_staker.stake *
                     (_reward.perStakedToken -
-                        _stakerRewardInfo.consolidatedPerStakedToken), 
-                MULTIPLIER);
+                        _stakerRewardInfo.consolidatedPerStakedToken)) /
+                MULTIPLIER;
             _stakerRewardInfo.consolidatedPerStakedToken = _reward
                 .perStakedToken;
         }
@@ -321,7 +322,7 @@ contract ERC20StakingRewardsDistribution {
                     _amount
                 );
                 rewards[_i].amount += _amount;
-                rewards[_i].unrewarded += _amount;
+                rewards[_i].amountRemaining += _amount;
             }
             _updatedAmounts[_i] = rewards[_i].amount;
         }
@@ -354,7 +355,7 @@ contract ERC20StakingRewardsDistribution {
             _outstandingRewards[_i] +=
                 (_staker.stake *
                     _lastPeriodDuration *
-                    _reward.unrewarded) /
+                    _reward.amountRemaining) /
                 totalStakedTokensAmount /
                 _unconsolidatedDuration;
         }
@@ -409,7 +410,7 @@ contract ERC20StakingRewardsDistribution {
         require(block.timestamp >= endingTimestamp, "SRD12");
         for (uint256 _i = 0; _i < rewards.length; _i++) {
             Reward storage _reward = rewards[_i];
-            if (_reward.token == _rewardToken) return _reward.unrewarded;
+            if (_reward.token == _rewardToken) return _reward.amountRemaining;
         }
         return 0;
     }
