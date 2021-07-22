@@ -122,7 +122,7 @@ contract ERC20StakingRewardsDistribution {
                     token: _rewardTokenAddress,
                     amount: _rewardAmount,
                     unassigned: _rewardAmount * MULTIPLIER,
-                    perStakedToken: 0,
+                    perStakedToken: 0
                 })
             );
         }
