@@ -275,6 +275,8 @@ contract ERC20StakingRewardsDistribution {
     function consolidateReward() private {
         uint64 _consolidationTimestamp =
             uint64(Math.min(block.timestamp, endingTimestamp));
+        if (_consolidationTimestamp < lastConsolidationTimestamp) // hasn't started yet
+            return; 
         uint256 _lastPeriodDuration =
             uint256(_consolidationTimestamp - lastConsolidationTimestamp);
         uint256 _unconsolidatedDuration =
@@ -306,6 +308,7 @@ contract ERC20StakingRewardsDistribution {
 
     function addRewards(address _token, uint256 _amount) public {
         consolidateReward();
+        return;
         uint256[] memory _updatedAmounts = new uint256[](rewards.length);
         for (uint32 _i = 0; _i < rewards.length; _i++) {
             address _rewardTokenAddress = rewards[_i].token;
