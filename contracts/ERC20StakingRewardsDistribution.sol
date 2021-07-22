@@ -75,7 +75,6 @@ contract ERC20StakingRewardsDistribution {
     uint256 public totalStakedTokensAmount;
     uint256 public stakingCap;
 
-    //event Earned(address token ,uint256 rewardPerToken ,uint256 staked);
     event OwnershipTransferred(
         address indexed previousOwner,
         address indexed newOwner
