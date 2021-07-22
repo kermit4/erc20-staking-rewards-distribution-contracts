@@ -285,17 +285,15 @@ contract ERC20StakingRewardsDistribution {
             Reward storage _reward = rewards[_i];
             StakerRewardInfo storage _stakerRewardInfo =
                 _staker.rewardInfo[_reward.token];
-            uint256 _thisPerStakedToken;
             if (_unconsolidatedDuration * totalStakedTokensAmount > 0) {
-                _thisPerStakedToken =
+                uint256 _thisPerStakedToken =
                     (_lastPeriodDuration * _reward.unassigned) /
-                    totalStakedTokensAmount /
-                    _unconsolidatedDuration;
+                        totalStakedTokensAmount /
+                        _unconsolidatedDuration;
                 _reward.perStakedToken += _thisPerStakedToken;
+                _reward.unassigned -= (_thisPerStakedToken *
+                    totalStakedTokensAmount);
             }
-            _reward.unassigned -= (_thisPerStakedToken *
-                totalStakedTokensAmount);
-
             _stakerRewardInfo.earned +=
                 (_staker.stake *
                     (_reward.perStakedToken -
