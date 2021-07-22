@@ -46,7 +46,6 @@ contract ERC20StakingRewardsDistribution {
         uint256 amount;
         uint256 unassigned;
         uint256 perStakedToken;
-        uint256 claimed;
     }
 
     struct StakerRewardInfo {
@@ -124,7 +123,6 @@ contract ERC20StakingRewardsDistribution {
                     amount: _rewardAmount,
                     unassigned: _rewardAmount * MULTIPLIER,
                     perStakedToken: 0,
-                    claimed: 0
                 })
             );
         }
@@ -176,7 +174,6 @@ contract ERC20StakingRewardsDistribution {
         for (uint256 _i; _i < rewards.length; _i++) {
             Reward storage _reward = rewards[_i];
             // recoverable rewards are going to be recovered in this tx (if it does not revert),
-            // so we add them to the claimed rewards right now
             if (_reward.unassigned == 0) continue;
             _atLeastOneNonZeroRecovery = true;
             _recoveredUnassignedRewards[_i] = _reward.unassigned / MULTIPLIER;
@@ -241,7 +238,6 @@ contract ERC20StakingRewardsDistribution {
             if (!_atLeastOneNonZeroClaim && _wantedAmount > 0)
                 _atLeastOneNonZeroClaim = true;
             _stakerRewardInfo.claimed += _wantedAmount;
-            _reward.claimed += _wantedAmount;
             IERC20(_reward.token).safeTransfer(_recipient, _wantedAmount);
             _claimedRewards[_i] = _wantedAmount;
         }
@@ -263,7 +259,6 @@ contract ERC20StakingRewardsDistribution {
             if (_claimableReward == 0) continue;
             _atLeastOneNonZeroClaim = true;
             _stakerRewardInfo.claimed += _claimableReward;
-            _reward.claimed += _claimableReward;
 
             IERC20(_reward.token).safeTransfer(_recipient, _claimableReward);
             _claimedRewards[_i] = _claimableReward;
