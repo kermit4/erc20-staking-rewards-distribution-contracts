@@ -56,8 +56,14 @@ contract(
             secondStakerAddress = accounts[2];
             thirdStakerAddress = accounts[3];
         });
+        var testr = [1,2,3 ]
+        testr.forEach(r =>
+            it("testn " + r, async () => {
+                console.log("r " + r + "\n");
+            })
+        );
 
-        it.only("should succeed in claiming the full reward if only one staker stakes right from the first second", async () => {
+        it("should succeed in claiming the full reward if only one staker stakes right from the first second", async () => {
             var stakedAmount=0;
             var splitLines = [];
             var rewardAmount = [];
