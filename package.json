@@ -28,7 +28,6 @@
     "dependencies": {
         "@openzeppelin/contracts": "^4.0.0",
         "@openzeppelin/test-helpers": "^0.5.11",
-        "d3-fetch": "^3.0.1",
         "luxon": "^2.0.1"
     },
     "devDependencies": {
