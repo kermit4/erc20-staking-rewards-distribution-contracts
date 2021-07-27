@@ -1,3 +1,4 @@
+const fs = require('fs')
 require("../../utils/assertion.js");
 const BN = require("bn.js");
 const { expect } = require("chai");
@@ -56,13 +57,30 @@ contract(
             thirdStakerAddress = accounts[3];
         });
 
-        it("should succeed in claiming the full reward if only one staker stakes right from the first second", async () => {
-            const stakedAmount = await toWei(20, stakableTokenInstance);
-            const firstRewardAmount = await toWei(10, firstRewardTokenInstance);
-            const secondRewardAmount = await toWei(
-                20,
-                secondRewardTokenInstance
-            );
+        it.only("should succeed in claiming the full reward if only one staker stakes right from the first second", async () => {
+            var stakedAmount=0;
+            var splitLines = [];
+            var rewardAmount = [];
+            var data = fs.readFileSync('test.csv','utf8');
+
+            var lines = data.split('\n');
+             
+            splitLines = lines.map(l => l.split(','));
+            splitLines.slice(1,).forEach(l => 
+                    { switch(l[1]) {
+                        case 'staker': 
+                            if(l[0]==0) {
+                                stakedAmount = l[3];
+                            }
+                        case 'reward':
+                            if(l[0]==0)
+                                rewardAmount[l[2]]=l[3];
+                           }
+            });
+            stakedAmount = await toWei(stakedAmount, stakableTokenInstance);
+            const firstRewardAmount = await toWei(rewardAmount[0], firstRewardTokenInstance);
+            const secondRewardAmount = await toWei( rewardAmount[1], secondRewardTokenInstance);
+            const duration = splitLines[0][1];
             const {
                 erc20DistributionInstance,
                 startingTimestamp,
@@ -76,7 +94,7 @@ contract(
                     secondRewardTokenInstance,
                 ],
                 rewardAmounts: [firstRewardAmount, secondRewardAmount],
-                duration: 10,
+                duration: duration,
             });
             await initializeStaker({
                 erc20DistributionInstance,
@@ -108,7 +126,7 @@ contract(
                 onchainStartingTimestamp
             );
 
-            expect(stakingDuration).to.be.equalBn(new BN(10));
+            expect(stakingDuration).to.be.equalBn(new BN(duration));
             const firstStakerRewardsTokenBalance = await firstRewardTokenInstance.balanceOf(
                 firstStakerAddress
             );
