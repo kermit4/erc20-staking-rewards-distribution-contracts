@@ -58,110 +58,124 @@ contract(
         });
 
 
-	fs.readFileSync('test.csv','utf8')
-		.split('\n===\n')
-		.forEach(
-		test =>  {
-			var testlines = test.split('\n');
-			async function generic_one() {
-				var stakedAmount=0;
-				var splitLines = [];
-				var rewardAmount = [];
-				const duration = initCols[2];
-				console.log(console.log("calling with test " + test + "\n"));
-                testlines
-                .forEach(
-                   row => { 
-                        col=row.split(",");
-                        switch(col[1]) {
-                        case 'staker': 
-                            if(col[0]==0) {
-                                stakedAmount = col[3];
-                            }
-                        case 'reward':
-                            if(col[0]==0)
-                                rewardAmount[col[2]]=col[3];
-                   } })
+        fs.readFileSync('test.csv','utf8')
+            .split('\n===\n')
+            .forEach(
+                test =>  {
+                    var testlines = test.split('\n');
+                    console.log("testlines");
+                    console.log(testlines);
+                    var initCols=testlines[0+(testlines[0]=="===")].split(',');
+                    async function generic_one() { // closure preserves the current scope not just the namespace, future mods will modify what it references when it does  "test" didnt seem to change before they were called, i guess its a new test Each?
+                        var stakedAmount=0;
+                        var splitLines = [];
+                        var rewardAmount = [];
+                        var lasttime=0;
+                        const duration = initCols[2];
+                        console.log(console.log("testing " + testlines + "\n"));
+                        testlines
+                            .forEach(
+                                async row => { 
+                                    col=row.split(",");
+                                    if(col[0]>lasttime) {
+                                        await fastForwardTo({ timestamp: startingTimestamp.add(new BN(col[1])) });
+                                        lasttime=col[0];
+                                    }
+                                    switch(col[1]) {
+                                        case 'reward':
+                                            if(col[0]==0)
+                                                rewardAmount[col[2]]=col[3];
+                                            // case $1 > current , fast forward
+                                            // etc do everything in this loop
 
-				stakedAmount = await toWei(stakedAmount, stakableTokenInstance);
-				const firstRewardAmount = await toWei(rewardAmount[0], firstRewardTokenInstance);
-				const secondRewardAmount = await toWei( rewardAmount[1], secondRewardTokenInstance);
-				const {
-					erc20DistributionInstance,
-					startingTimestamp,
-					endingTimestamp,
-				} = await initializeDistribution({
-					from: ownerAddress,
-					erc20DistributionFactoryInstance,
-					stakableToken: stakableTokenInstance,
-					rewardTokens: [
-						firstRewardTokenInstance,
-						secondRewardTokenInstance,
-					],
-					rewardAmounts: [firstRewardAmount, secondRewardAmount],
-					duration: duration,
-				});
-				await initializeStaker({
-					erc20DistributionInstance,
-					stakableTokenInstance,
-					stakerAddress: firstStakerAddress,
-					stakableAmount: stakedAmount,
-				});
-				await fastForwardTo({
-					timestamp: startingTimestamp,
-				});
-				await stakeAtTimestamp(
-					erc20DistributionInstance,
-					firstStakerAddress,
-					stakedAmount,
-					startingTimestamp
-				);
-				const stakerStartingTimestamp = await getEvmTimestamp();
-				expect(stakerStartingTimestamp).to.be.equalBn(startingTimestamp);
-				// make sure the distribution has ended
-				await fastForwardTo({ timestamp: endingTimestamp.add(new BN(1)) });
-				await erc20DistributionInstance.claimAll(firstStakerAddress, {
-					from: firstStakerAddress,
-				});
-				const onchainStartingTimestamp = await erc20DistributionInstance.startingTimestamp();
-				const onchainEndingTimestamp = await erc20DistributionInstance.endingTimestamp();
-				expect(onchainStartingTimestamp).to.be.equalBn(startingTimestamp);
-				expect(onchainEndingTimestamp).to.be.equalBn(endingTimestamp);
-				const stakingDuration = onchainEndingTimestamp.sub(
-					onchainStartingTimestamp
-				);
+                                            const firstRewardAmount = await toWei(rewardAmount[0], firstRewardTokenInstance);
+                                            const secondRewardAmount = await toWei( rewardAmount[1], secondRewardTokenInstance);
+                                            const {
+                                                erc20DistributionInstance,
+                                                startingTimestamp,
+                                                endingTimestamp,
+                                            } = await initializeDistribution({
+                                                from: ownerAddress,
+                                                erc20DistributionFactoryInstance,
+                                                stakableToken: stakableTokenInstance,
+                                                rewardTokens: [
+                                                    firstRewardTokenInstance,
+                                                    secondRewardTokenInstance,
+                                                ],
+                                                rewardAmounts: [firstRewardAmount, secondRewardAmount],
+                                                duration: duration,
+                                            });
+                                            await initializeStaker({
+                                                erc20DistributionInstance,
+                                                stakableTokenInstance,
+                                                stakerAddress: firstStakerAddress,
+                                                stakableAmount: stakedAmount,
+                                            });
+                                            await fastForwardTo({
+                                                timestamp: startingTimestamp,
+                                            });
 
-				expect(stakingDuration).to.be.equalBn(new BN(duration));
-				const firstStakerRewardsTokenBalance = await firstRewardTokenInstance.balanceOf(
-					firstStakerAddress
-				);
-				expect(firstStakerRewardsTokenBalance).to.equalBn(
-					firstRewardAmount
-				);
-				// additional checks to be extra safe
-				expect(firstStakerRewardsTokenBalance).to.equalBn(
-					firstRewardAmount
-				);
+                                        case 'staker': 
+                                            if(col[0]==0) {
+                                                stakedAmount = await toWei(col[3], stakableTokenInstance);
+                                                await stakeAtTimestamp(
+                                                    erc20DistributionInstance,
+                                                    firstStakerAddress,
+                                                    stakedAmount,
+                                                    startingTimestamp
+                                                );
+                                                const stakerStartingTimestamp = await getEvmTimestamp();
+                                                expect(stakerStartingTimestamp).to.be.equalBn(startingTimestamp);
+                                                // make sure the distribution has ended
+                                            } 
+                                        case 'claimall': 
+                                            try {
+                                                await erc20DistributionInstance.claimAll(firstStakerAddress, {
+                                                    from: firstStakerAddress,
+                                                });
+                                                if(col[2]) throw new Error("should have failed");
+                                            } catch (error) {
+                                                expect(error.message).to.contain(col[2]);
+                                            }
+                                            const onchainStartingTimestamp = await erc20DistributionInstance.startingTimestamp();
+                                            const onchainEndingTimestamp = await erc20DistributionInstance.endingTimestamp();
+                                            expect(onchainStartingTimestamp).to.be.equalBn(startingTimestamp);
+                                            expect(onchainEndingTimestamp).to.be.equalBn(endingTimestamp);
+                                            const stakingDuration = onchainEndingTimestamp.sub(
+                                                onchainStartingTimestamp
+                                            );
 
-				const secondStakerRewardsTokenBalance = await secondRewardTokenInstance.balanceOf(
-					firstStakerAddress
-				);
-				expect(secondStakerRewardsTokenBalance).to.equalBn(
-					secondRewardAmount
-				);
-				// additional checks to be extra safe
-				expect(secondStakerRewardsTokenBalance).to.equalBn(
-					secondRewardAmount
-				);
-			};
+                                            expect(stakingDuration).to.be.equalBn(new BN(duration));
+                                            const firstStakerRewardsTokenBalance = await firstRewardTokenInstance.balanceOf(
+                                                firstStakerAddress
+                                            );
+                                            expect(firstStakerRewardsTokenBalance).to.equalBn(
+                                                firstRewardAmount
+                                            );
+                                            // additional checks to be extra safe
+                                            expect(firstStakerRewardsTokenBalance).to.equalBn(
+                                                firstRewardAmount
+                                            );
 
-			initCols=testlines[0].split(',');
-			it(initCols[0] , generic_one);
-});
+                                            const secondStakerRewardsTokenBalance = await secondRewardTokenInstance.balanceOf(
+                                                firstStakerAddress
+                                            );
+                                            expect(secondStakerRewardsTokenBalance).to.equalBn(
+                                                secondRewardAmount
+                                            );
+                                            // additional checks to be extra safe
+                                            expect(secondStakerRewardsTokenBalance).to.equalBn(
+                                                secondRewardAmount
+                                            );
+                                    };
 
-            
+                                    it(initCols[0] , generic_one);
+                                })} 
+                });
 
-     if (false)    it("should fail when claiming zero rewards (claimAll)", async () => {
+
+
+        if (false)    it("should fail when claiming zero rewards (claimAll)", async () => {
             const stakedAmount = await toWei(20, stakableTokenInstance);
             const firstRewardsAmount = await toWei(
                 10,
@@ -202,7 +216,7 @@ contract(
             }
         });
 
-     if (false)    it("should succeed when claiming zero first rewards and all of the second rewards", async () => {
+        if (false)    it("should succeed when claiming zero first rewards and all of the second rewards", async () => {
             const stakedAmount = await toWei(20, stakableTokenInstance);
             const firstRewardsAmount = await toWei(
                 10,
@@ -266,7 +280,7 @@ contract(
             ).to.be.equalBn(secondRewardsAmount);
         });
 
-     if (false)    it("should succeed when claiming zero first reward and all of the second reward", async () => {
+        if (false)    it("should succeed when claiming zero first reward and all of the second reward", async () => {
             const stakedAmount = await toWei(20, stakableTokenInstance);
             const firstRewardsAmount = await toWei(
                 10,
@@ -330,7 +344,7 @@ contract(
             ).to.be.equalBn(ZERO_BN);
         });
 
-     if (false)    it("should succeed when claiming zero first rewards and part of the second rewards", async () => {
+        if (false)    it("should succeed when claiming zero first rewards and part of the second rewards", async () => {
             const stakedAmount = await toWei(20, stakableTokenInstance);
             const firstRewardsAmount = await toWei(
                 10,
@@ -395,7 +409,7 @@ contract(
             ).to.be.equalBn(secondRewardsAmount);
         });
 
-     if (false)    it("should succeed when claiming zero first reward and all of the second reward", async () => {
+        if (false)    it("should succeed when claiming zero first reward and all of the second reward", async () => {
             const stakedAmount = await toWei(20, stakableTokenInstance);
             const firstRewardsAmount = await toWei(
                 10,
@@ -460,7 +474,7 @@ contract(
             ).to.be.equalBn(halfSecondRewardsAmount);
         });
 
-     if (false)    it("should succeed in claiming two multiple rewards if two stakers stake exactly the same amount at different times", async () => {
+        if (false)    it("should succeed in claiming two multiple rewards if two stakers stake exactly the same amount at different times", async () => {
             const stakedAmount = await toWei(10, stakableTokenInstance);
             const duration = new BN(10);
             const firstRewardAmount = await toWei(10, firstRewardTokenInstance);
@@ -581,7 +595,7 @@ contract(
             ).to.be.equalBn(expectedSecondSecondStakerReward);
         });
 
-     if (false)    it("should succeed in claiming three rewards if three stakers stake exactly the same amount at different times", async () => {
+        if (false)    it("should succeed in claiming three rewards if three stakers stake exactly the same amount at different times", async () => {
             const stakedAmount = await toWei(10, stakableTokenInstance);
             const duration = new BN(12);
             const firstRewardAmount = await toWei(12, firstRewardTokenInstance);
@@ -755,7 +769,7 @@ contract(
             ).to.be.closeBn(expectedSecondThirdStakerReward, MAXIMUM_VARIANCE);
         });
 
-     if (false)    it("should succeed in claiming a reward if a staker stakes when the distribution has already started", async () => {
+        if (false)    it("should succeed in claiming a reward if a staker stakes when the distribution has already started", async () => {
             const stakedAmount = await toWei(10, stakableTokenInstance);
             const duration = new BN(10);
             const firstRewardsAmount = await toWei(
@@ -822,7 +836,7 @@ contract(
             ).to.be.equalBn(secondRewardsAmount);
         });
 
-     if (false)    it("should fail in claiming 0 rewards if a staker stakes at the last second (literally)", async () => {
+        if (false)    it("should fail in claiming 0 rewards if a staker stakes at the last second (literally)", async () => {
             const stakedAmount = await toWei(10, stakableTokenInstance);
             const duration = new BN(10);
             const firstRewardsAmount = await toWei(
@@ -881,7 +895,7 @@ contract(
             }
         });
 
-     if (false)    it("should succeed in claiming one rewards if a staker stakes at the last valid distribution second", async () => {
+        if (false)    it("should succeed in claiming one rewards if a staker stakes at the last valid distribution second", async () => {
             const stakedAmount = await toWei(10, stakableTokenInstance);
             const duration = new BN(10);
             const firstRewardsAmount = await toWei(
@@ -940,7 +954,7 @@ contract(
             ).to.be.closeBn(secondRewardsAmount, MAXIMUM_VARIANCE);
         });
 
-     if (false)    it("should succeed in claiming two rewards if two stakers stake exactly the same amount at different times, and then the first staker withdraws a portion of his stake", async () => {
+        if (false)    it("should succeed in claiming two rewards if two stakers stake exactly the same amount at different times, and then the first staker withdraws a portion of his stake", async () => {
             const stakedAmount = await toWei(10, stakableTokenInstance);
             const duration = new BN(10);
             const firstRewardsAmount = await toWei(
@@ -1055,18 +1069,18 @@ contract(
                 .mul(new BN(3))
                 .add(
                     firstRewardPerSecond
-                        .mul(new BN(2))
-                        .mul(new BN(2))
-                        .div(new BN(3))
+                    .mul(new BN(2))
+                    .mul(new BN(2))
+                    .div(new BN(3))
                 );
             const expectedSecondSecondStakerReward = secondRewardPerSecond
                 .div(new BN(2))
                 .mul(new BN(3))
                 .add(
                     secondRewardPerSecond
-                        .mul(new BN(2))
-                        .mul(new BN(2))
-                        .div(new BN(3))
+                    .mul(new BN(2))
+                    .mul(new BN(2))
+                    .div(new BN(3))
                 );
             // first staker claim and rewards balance check
             await erc20DistributionInstance.claimAll(firstStakerAddress, {
@@ -1090,7 +1104,7 @@ contract(
             ).to.be.closeBn(expectedSecondSecondStakerReward, MAXIMUM_VARIANCE);
         });
 
-     if (false)    it("should succeed in claiming two rewards if two stakers both stake at the last valid distribution second", async () => {
+        if (false)    it("should succeed in claiming two rewards if two stakers both stake at the last valid distribution second", async () => {
             const stakedAmount = await toWei(10, stakableTokenInstance);
             const duration = new BN(10);
             const firstRewardsAmount = await toWei(
@@ -1193,7 +1207,7 @@ contract(
             ).to.be.closeBn(expectedSecondSecondStakerReward, MAXIMUM_VARIANCE);
         });
 
-     if (false)    it("should succeed in claiming a reward if a staker stakes at second n and then increases their stake", async () => {
+        if (false)    it("should succeed in claiming a reward if a staker stakes at second n and then increases their stake", async () => {
             const stakedAmount = await toWei(10, stakableTokenInstance);
             const duration = new BN(10);
             const firstRewardsAmount = await toWei(
@@ -1272,7 +1286,7 @@ contract(
             ).to.be.equalBn(secondRewardsAmount);
         });
 
-     if (false)    it("should succeed in claiming two rewards if two staker respectively stake and withdraw at the same second", async () => {
+        if (false)    it("should succeed in claiming two rewards if two staker respectively stake and withdraw at the same second", async () => {
             const stakedAmount = await toWei(10, stakableTokenInstance);
             const duration = new BN(10);
             const firstRewardsAmount = await toWei(
@@ -1389,7 +1403,7 @@ contract(
             ).to.be.equalBn(expectedSecondReward);
         });
 
-     if (false)    it("should fail when trying to claim passing an excessive-length amounts array", async () => {
+        if (false)    it("should fail when trying to claim passing an excessive-length amounts array", async () => {
             const duration = new BN(10);
             const {
                 startingTimestamp,
@@ -1420,7 +1434,7 @@ contract(
             }
         });
 
-     if (false)    it("should fail when trying to claim passing a defective-length amounts array", async () => {
+        if (false)    it("should fail when trying to claim passing a defective-length amounts array", async () => {
             const duration = new BN(10);
             const {
                 startingTimestamp,
@@ -1451,7 +1465,7 @@ contract(
             }
         });
 
-     if (false)    it("should fail when trying to claim only a part of the reward, if the first passed in amount is bigger than allowed", async () => {
+        if (false)    it("should fail when trying to claim only a part of the reward, if the first passed in amount is bigger than allowed", async () => {
             const stakedAmount = await toWei(10, stakableTokenInstance);
             const duration = new BN(10);
             const firstRewardsAmount = await toWei(
@@ -1511,7 +1525,7 @@ contract(
             }
         });
 
-     if (false)    it("should fail when trying to claim only a part of the reward, if the second passed in amount is bigger than allowed", async () => {
+        if (false)    it("should fail when trying to claim only a part of the reward, if the second passed in amount is bigger than allowed", async () => {
             const stakedAmount = await toWei(10, stakableTokenInstance);
             const duration = new BN(10);
             const firstRewardsAmount = await toWei(
@@ -1568,7 +1582,7 @@ contract(
             }
         });
 
-     if (false)    it("should fail when trying to claim only a part of the reward, if the second passed in amount is bigger than allowed", async () => {
+        if (false)    it("should fail when trying to claim only a part of the reward, if the second passed in amount is bigger than allowed", async () => {
             const stakedAmount = await toWei(10, stakableTokenInstance);
             const duration = new BN(10);
             const firstRewardsAmount = await toWei(
@@ -1625,7 +1639,7 @@ contract(
             }
         });
 
-     if (false)    it("should fail when trying to claim only a part of the reward, if the second passed in amount is bigger than allowed", async () => {
+        if (false)    it("should fail when trying to claim only a part of the reward, if the second passed in amount is bigger than allowed", async () => {
             const stakedAmount = await toWei(10, stakableTokenInstance);
             const duration = new BN(10);
             const firstRewardsAmount = await toWei(
@@ -1682,7 +1696,7 @@ contract(
             }
         });
 
-     if (false)    it("should succeed in claiming specific amounts under the right conditions", async () => {
+        if (false)    it("should succeed in claiming specific amounts under the right conditions", async () => {
             const stakedAmount = await toWei(10, stakableTokenInstance);
             const duration = new BN(10);
             const firstRewardsAmount = await toWei(
@@ -1741,7 +1755,7 @@ contract(
             ).to.be.equalBn(secondRewardsAmount);
         });
 
-     if (false)    it("should succeed in claiming specific amounts to a foreign address under the right conditions", async () => {
+        if (false)    it("should succeed in claiming specific amounts to a foreign address under the right conditions", async () => {
             const stakedAmount = await toWei(10, stakableTokenInstance);
             const duration = new BN(10);
             const firstRewardsAmount = await toWei(
