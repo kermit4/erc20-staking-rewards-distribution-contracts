@@ -1,10 +1,5 @@
-===
 should succeed in claiming the full reward if only one staker stakes right from the first second,title,10
 0,staker,0,20
 0,reward,0,10
 0,reward,1,20
-===
-should fail when claiming zero rewards (claimAll),title,10
-0,staker,0,20
-0,reward,0,10
-0,reward,1,20
+11,claimall
