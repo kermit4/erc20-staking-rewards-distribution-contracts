@@ -348,6 +348,8 @@ contract ERC20StakingRewardsDistribution {
             _outstandingRewards[_i] = (_stakerRewardInfo.earned -
                 _stakerRewardInfo.claimed);
             if (_staker.stake == 0) continue;
+            if (_unconsolidatedDuration == 0)
+                continue;
             _outstandingRewards[_i] +=
                 ((_staker.stake * _lastPeriodDuration * _reward.unassigned) /
                     MULTIPLIER) /
