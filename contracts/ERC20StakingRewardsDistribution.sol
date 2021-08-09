@@ -275,8 +275,9 @@ contract ERC20StakingRewardsDistribution {
     function consolidateReward() private {
         uint64 _consolidationTimestamp =
             uint64(Math.min(block.timestamp, endingTimestamp));
-        if (_consolidationTimestamp < lastConsolidationTimestamp) // hasn't started yet
-            return; 
+        if (_consolidationTimestamp < lastConsolidationTimestamp)
+            // hasn't started yet
+            return;
         uint256 _lastPeriodDuration =
             uint256(_consolidationTimestamp - lastConsolidationTimestamp);
         uint256 _unconsolidatedDuration =
@@ -337,7 +338,6 @@ contract ERC20StakingRewardsDistribution {
             uint64(Math.min(block.timestamp, endingTimestamp));
         uint256 _lastPeriodDuration =
             uint256(_consolidationTimestamp - lastConsolidationTimestamp);
-        if (_lastPeriodDuration == 0) return _outstandingRewards;
         uint256 _unconsolidatedDuration =
             uint256(endingTimestamp - lastConsolidationTimestamp);
         Staker storage _staker = stakers[_account];
@@ -403,10 +403,25 @@ contract ERC20StakingRewardsDistribution {
         returns (uint256)
     {
         require(block.timestamp >= endingTimestamp, "SRD12");
-        for (uint256 _i = 0; _i < rewards.length; _i++) {
-            Reward storage _reward = rewards[_i];
-            if (_reward.token == _rewardToken)
-                return _reward.unassigned / MULTIPLIER;
+        uint64 _consolidationTimestamp =
+            uint64(Math.min(block.timestamp, endingTimestamp));
+        uint256 _lastPeriodDuration =
+            uint256(_consolidationTimestamp - lastConsolidationTimestamp);
+        uint256 _unconsolidatedDuration =
+            uint256(endingTimestamp - lastConsolidationTimestamp);
+        for (uint256 _i; _i < rewards.length; _i++) {
+            Reward memory _reward = rewards[_i];
+            if (_reward.token != _rewardToken) continue;
+            if (_unconsolidatedDuration * totalStakedTokensAmount > 0) {
+                uint256 _thisPerStakedToken =
+                    (_lastPeriodDuration * _reward.unassigned) /
+                        totalStakedTokensAmount /
+                        _unconsolidatedDuration;
+                _reward.perStakedToken += _thisPerStakedToken;
+                _reward.unassigned -= (_thisPerStakedToken *
+                    totalStakedTokensAmount);
+            }
+            return _reward.unassigned / MULTIPLIER;
         }
         return 0;
     }
