@@ -1,4 +1,4 @@
-require("../../utils/assertion.js"); 
+require("../../utils/assertion.js");
 const BN = require("bn.js");
 const { expect } = require("chai");
 const { MAXIMUM_VARIANCE, ZERO_BN } = require("../../constants");
@@ -787,10 +787,10 @@ contract(
             });
             expect(
                 await firstRewardTokenInstance.balanceOf(firstStakerAddress)
-            ).to.be.equalBn(await toWei("5", firstRewardTokenInstance));
+            ).to.be.equalBn(firstRewardsAmount);
             expect(
                 await secondRewardTokenInstance.balanceOf(firstStakerAddress)
-            ).to.be.equalBn(await toWei("10", secondRewardTokenInstance));
+            ).to.be.equalBn(secondRewardsAmount);
         });
 
         it("should fail in claiming 0 rewards if a staker stakes at the last second (literally)", async () => {
@@ -900,17 +900,15 @@ contract(
                 campaignEndingTimestamp.sub(stakerStartingTimestamp)
             ).to.be.equalBn(new BN(1));
 
-            const firstRewardPerSecond = firstRewardsAmount.div(duration);
-            const secondRewardPerSecond = secondRewardsAmount.div(duration);
             await erc20DistributionInstance.claimAll(firstStakerAddress, {
                 from: firstStakerAddress,
             });
             expect(
                 await firstRewardTokenInstance.balanceOf(firstStakerAddress)
-            ).to.be.closeBn(firstRewardPerSecond, MAXIMUM_VARIANCE);
+            ).to.be.closeBn(firstRewardsAmount, MAXIMUM_VARIANCE);
             expect(
                 await secondRewardTokenInstance.balanceOf(firstStakerAddress)
-            ).to.be.closeBn(secondRewardPerSecond, MAXIMUM_VARIANCE);
+            ).to.be.closeBn(secondRewardsAmount, MAXIMUM_VARIANCE);
         });
 
         it("should succeed in claiming two rewards if two stakers stake exactly the same amount at different times, and then the first staker withdraws a portion of his stake", async () => {
@@ -1130,20 +1128,18 @@ contract(
                 new BN(1)
             );
 
-            const firstRewardPerSecond = firstRewardsAmount.div(duration);
-            const secondRewardPerSecond = secondRewardsAmount.div(duration);
             // the first staker had half of the rewards for 1 second
-            const expectedFirstFirstStakerReward = firstRewardPerSecond.div(
+            const expectedFirstFirstStakerReward = firstRewardsAmount.div(
                 new BN(2)
             );
-            const expectedSecondFirstStakerReward = secondRewardPerSecond.div(
+            const expectedSecondFirstStakerReward = secondRewardsAmount.div(
                 new BN(2)
             );
             // the second staker had half of the rewards for 1 second
-            const expectedFirstSecondStakerReward = firstRewardPerSecond.div(
+            const expectedFirstSecondStakerReward = firstRewardsAmount.div(
                 new BN(2)
             );
-            const expectedSecondSecondStakerReward = secondRewardPerSecond.div(
+            const expectedSecondSecondStakerReward = secondRewardsAmount.div(
                 new BN(2)
             );
 

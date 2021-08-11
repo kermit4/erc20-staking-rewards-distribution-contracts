@@ -1,4 +1,4 @@
-require("../../utils/assertion.js"); 
+require("../../utils/assertion.js");
 const { expect } = require("chai");
 const {
     initializeDistribution,
@@ -323,7 +323,7 @@ contract(
             );
             const expectedRewardPerStakedToken = firstStintDuration
                 .mul(rewardAmount)
-                .mul(new BN(2).pow(new BN(112)))
+                .mul(await erc20DistributionInstance.MULTIPLIER())
                 .div(halfStakableAmount.mul(duration));
             expect(postSecondStakeRewards.perStakedToken).to.be.equalBn(
                 expectedRewardPerStakedToken
@@ -335,7 +335,7 @@ contract(
             expect(onChainEarnedAmount[0]).to.be.closeBn(
                 halfStakableAmount // in order to check the consolidation of the first stint we need to use the staked amount in the first stint here, not the current onchain value, which is doubled
                     .mul(expectedRewardPerStakedToken)
-                    .div(new BN(2).pow(new BN(112))),
+                    .div(await erc20DistributionInstance.MULTIPLIER()),
                 MAXIMUM_VARIANCE
             );
         });

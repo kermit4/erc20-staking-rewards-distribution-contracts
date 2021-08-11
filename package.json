@@ -11,11 +11,12 @@
         "/build/ERC20StakingRewardsDistributionFactory.json"
     ],
     "scripts": {
-        "lint:eslint": "eslint \"test/**/*.js\"",
-        "lint:prettier": "prettier -l contracts/**/*.sol && prettier -l test/**/*.js",
+        "lint:eslint": "find test -name '*.js' -exec eslint {} +",
+        "lint:prettier": "find contracts test \\( -name '*.sol' -o -name '*.js' \\) -exec prettier -l {} +",
+        "lint:prettier_write": "find contracts test \\( -name '*.sol' -o -name '*.js' \\) -exec prettier -w {} +",
         "lint:commit-message": "commitlint -e",
         "lint": "yarn lint:eslint && yarn lint:prettier",
-        "test": "truffle test --runner-output-only",
+        "test": "./test.bash ",
         "test:coverage": "truffle run coverage",
         "test:gasreport": "truffle test --gas-report",
         "compile": "truffle compile",
@@ -25,7 +26,9 @@
     "author": "Federico Luzzi <fedeluzzi00@gmail.com>",
     "license": "GPL-3.0",
     "dependencies": {
-        "@openzeppelin/contracts": "^4.0.0"
+        "@openzeppelin/contracts": "^4.0.0",
+        "@openzeppelin/test-helpers": "^0.5.11",
+        "luxon": "^2.0.1"
     },
     "devDependencies": {
         "@commitlint/cli": "^11.0.0",

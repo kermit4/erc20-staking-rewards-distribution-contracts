@@ -1,4 +1,4 @@
-require("../../utils/assertion.js"); 
+require("../../utils/assertion.js");
 const BN = require("bn.js");
 const { expect } = require("chai");
 const { ZERO_ADDRESS } = require("../../constants");
@@ -134,44 +134,6 @@ contract(
                 throw new Error("should have failed");
             } catch (error) {
                 expect(error.message).to.contain("SRD04");
-            }
-        });
-
-        it("should fail when passing 0 as the first reward amount", async () => {
-            try {
-                await initializeDistribution({
-                    from: ownerAddress,
-                    erc20DistributionFactoryInstance,
-                    stakableToken: stakableTokenInstance,
-                    rewardTokens: [
-                        firstRewardsTokenInstance,
-                        secondRewardsTokenInstance,
-                    ],
-                    rewardAmounts: [0, 10],
-                    duration: 10,
-                });
-                throw new Error("should have failed");
-            } catch (error) {
-                expect(error.message).to.contain("SRD05");
-            }
-        });
-
-        it("should fail when passing 0 as the second reward amount", async () => {
-            try {
-                await initializeDistribution({
-                    from: ownerAddress,
-                    erc20DistributionFactoryInstance,
-                    stakableToken: stakableTokenInstance,
-                    rewardTokens: [
-                        firstRewardsTokenInstance,
-                        secondRewardsTokenInstance,
-                    ],
-                    rewardAmounts: [10, 0],
-                    duration: 10,
-                });
-                throw new Error("should have failed");
-            } catch (error) {
-                expect(error.message).to.contain("SRD05");
             }
         });
 

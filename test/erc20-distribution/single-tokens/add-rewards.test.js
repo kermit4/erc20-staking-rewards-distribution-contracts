@@ -1,5 +1,9 @@
 require("../../utils/assertion.js");
-const BN = require("bn.js");
+//const BN = require("bn.js");
+const {
+    expectEvent,
+    //   expectRevert,
+} = require("@openzeppelin/test-helpers");
 const { expect } = require("chai");
 const { initializeDistribution } = require("../../utils");
 
@@ -20,8 +24,8 @@ contract(
             firstRewardTokenInstance,
             secondRewardTokenInstance,
             stakableTokenInstance,
-            ownerAddress,
-            firstStakerAddress;
+            ownerAddress;
+        // ,firstStakerAddress
 
         beforeEach(async () => {
             const accounts = await web3.eth.getAccounts();
@@ -33,40 +37,14 @@ contract(
                 erc20DistributionInstance.address,
                 { from: ownerAddress }
             );
-            firstStakerAddress = accounts[1];
+            //firstStakerAddress = accounts[1];
             firstRewardTokenInstance = await FirstRewardERC20.new();
             secondRewardTokenInstance = await SecondRewardERC20.new();
             stakableTokenInstance = await FirstStakableERC20.new();
-            firstStakerAddress = accounts[1];
+            //firstStakerAddress = accounts[1];
         });
 
-        it("should give an empty array back when the distribution has not been initialized yet", async () => {
-            const erc20DistributionInstance = await ERC20StakingRewardsDistribution.new(
-                { from: ownerAddress }
-            );
-            const claimableRewards = await erc20DistributionInstance.claimableRewards(
-                firstStakerAddress
-            );
-            expect(claimableRewards).to.have.length(0);
-        });
-
-        it("should give an array back with length 1 when the distribution has been initialized with 1 reward token but not yet started", async () => {
-            const { erc20DistributionInstance } = await initializeDistribution({
-                from: ownerAddress,
-                erc20DistributionFactoryInstance,
-                stakableToken: stakableTokenInstance,
-                rewardTokens: [firstRewardTokenInstance],
-                rewardAmounts: ["10"],
-                duration: 10,
-            });
-            const claimableRewards = await erc20DistributionInstance.claimableRewards(
-                firstStakerAddress
-            );
-            expect(claimableRewards).to.have.length(1);
-            expect(claimableRewards[0]).to.be.equalBn(new BN(0));
-        });
-
-        it("should give an array back with length 2 when the distribution has been initialized with 2 reward token but not yet started", async () => {
+        it("should addRewards", async () => {
             const { erc20DistributionInstance } = await initializeDistribution({
                 from: ownerAddress,
                 erc20DistributionFactoryInstance,
@@ -78,12 +56,44 @@ contract(
                 rewardAmounts: ["10", "1"],
                 duration: 10,
             });
-            const claimableRewards = await erc20DistributionInstance.claimableRewards(
-                firstStakerAddress
+            await firstRewardTokenInstance.mint(ownerAddress, 60);
+            await firstRewardTokenInstance.approve(
+                erc20DistributionInstance.address,
+                60
             );
-            expect(claimableRewards).to.have.length(2);
-            expect(claimableRewards[0]).to.be.equalBn(new BN(0));
-            expect(claimableRewards[1]).to.be.equalBn(new BN(0));
+            const addRewards = await erc20DistributionInstance.addRewards(
+                firstRewardTokenInstance.address,
+                2
+            );
+            expectEvent(addRewards, "UpdatedRewards", {});
+            const reward = await erc20DistributionInstance.rewards(0);
+            expect(reward.token).to.be.equal(firstRewardTokenInstance.address);
+            expect(reward.amount.toNumber()).to.be.equal(12);
+        });
+        it("should not addRewards with unsupported token", async () => {
+            const { erc20DistributionInstance } = await initializeDistribution({
+                from: ownerAddress,
+                erc20DistributionFactoryInstance,
+                stakableToken: stakableTokenInstance,
+                rewardTokens: [secondRewardTokenInstance],
+                rewardAmounts: ["10"],
+                duration: 10,
+            });
+            await firstRewardTokenInstance.mint(ownerAddress, 60);
+            await firstRewardTokenInstance.approve(
+                erc20DistributionInstance.address,
+                60
+            );
+            const addRewards = await erc20DistributionInstance.addRewards(
+                firstRewardTokenInstance.address,
+                2
+            );
+            expectEvent(addRewards, "UpdatedRewards", {});
+            const reward = await erc20DistributionInstance.rewards(0);
+            expect(reward.token).to.not.be.equal(
+                firstRewardTokenInstance.address
+            );
+            expect(reward.amount.toNumber()).to.not.be.equal(12);
         });
     }
 );

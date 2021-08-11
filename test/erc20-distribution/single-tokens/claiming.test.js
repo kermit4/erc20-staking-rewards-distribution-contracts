@@ -1,4 +1,4 @@
-require("../../utils/assertion.js"); 
+require("../../utils/assertion.js");
 const BN = require("bn.js");
 const { expect } = require("chai");
 const { MAXIMUM_VARIANCE, ZERO_BN } = require("../../constants");
@@ -450,9 +450,8 @@ contract(
             expect(
                 onchainEndingTimestamp.sub(stakerStartingTimestamp)
             ).to.be.equalBn(new BN(5));
-            const rewardPerSecond = rewardsAmount.div(duration);
-            // the staker had all of the rewards for 5 seconds
-            const expectedFirstStakerReward = rewardPerSecond.mul(new BN(5));
+            // the staker had all of the rewards
+            const expectedFirstStakerReward = rewardsAmount;
             // claim and rewards balance check
             await erc20DistributionInstance.claimAll(firstStakerAddress, {
                 from: firstStakerAddress,
@@ -552,13 +551,12 @@ contract(
             expect(
                 campaignEndingTimestamp.sub(stakerStartingTimestamp)
             ).to.be.equalBn(new BN(1));
-            const rewardPerSecond = rewardsAmount.div(duration);
             await erc20DistributionInstance.claimAll(firstStakerAddress, {
                 from: firstStakerAddress,
             });
             expect(
                 await rewardsTokenInstance.balanceOf(firstStakerAddress)
-            ).to.be.closeBn(rewardPerSecond, MAXIMUM_VARIANCE);
+            ).to.be.closeBn(rewardsAmount, MAXIMUM_VARIANCE);
         });
 
         it("should succeed in claiming two rewards if two stakers stake exactly the same amount at different times, and then the first staker withdraws a portion of his stake", async () => {
@@ -739,11 +737,10 @@ contract(
                 new BN(1)
             );
 
-            const rewardPerSecond = rewardsAmount.div(duration);
             // the first staker had half of the rewards for 1 second
-            const expectedFirstStakerReward = rewardPerSecond.div(new BN(2));
+            const expectedFirstStakerReward = rewardsAmount.div(new BN(2));
             // the second staker had half of the rewards for 1 second
-            const expectedSecondStakerReward = rewardPerSecond.div(new BN(2));
+            const expectedSecondStakerReward = rewardsAmount.div(new BN(2));
 
             await erc20DistributionInstance.claimAll(firstStakerAddress, {
                 from: firstStakerAddress,
@@ -1101,33 +1098,18 @@ contract(
                 firstStakerAddress
             );
             const expectedRemainingReward = await toWei(
-                2,
+                4,
                 rewardsTokenInstance
             );
             expect(postClaimBalance.sub(preClaimBalance)).to.be.closeBn(
                 expectedRemainingReward,
-                MAXIMUM_VARIANCE
+                MAXIMUM_VARIANCE.mul(new BN(2))
             );
-
-            // we also test recovery for good measure. There have been staked tokens in the contract
-            // for all but 2 seconds (first staker staked at the start for 5 seconds and second staker
-            // staked at second 3 for 3 seconds, overlapping for 2, and then first staker restaked
-            // at the 8th second until the end)
-            await erc20DistributionInstance.recoverUnassignedRewards({
-                from: ownerAddress,
-            });
-            const expectedRecoveredReward = await toWei(
-                2,
-                rewardsTokenInstance
-            );
-            expect(
-                await rewardsTokenInstance.balanceOf(ownerAddress)
-            ).to.be.closeBn(expectedRecoveredReward, MAXIMUM_VARIANCE);
 
             // At this point all the tokens minus some wei due to integer truncation should
             // have been recovered from the contract.
-            // Initial reward was 10 tokens, the first staker got 6 in total, the second staker
-            // 2, and the owner recovered 2.
+            // Initial reward was 10 tokens, the first staker got 8 in total, the second staker
+            // 2
         });
     }
 );
